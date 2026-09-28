@@ -18,7 +18,7 @@ Bez Bot is a working clone of the [x.ai/bot](https://x.ai/bot) product (Grok Bot
 | Routines | Created by asking the Bot in chat ("Every weekday at 8:00 AM, …"). Each run is posted into the Bot's conversation and the result shows up there. Tasks → Routines in the details panel lists them with Pause/Resume, Test, Edit, Delete, the last 20 runs, and a webhook trigger (`POST` + bearer key). Up to 50 per Bot. |
 | Skills | One private library shared by every Bot (`save_skill`, `use_skill`). Type `/` in the composer to reference one. **Teach a task** (in the Agent Computer view) records your screen and the Bot writes it up as a draft skill for you to review. |
 | Memory | Per Bot (`remember` / `forget`), shown in the details panel, injected into every turn. |
-| The computer | One cloud computer per user, shared by all Bots (files, browser sessions, logins); each Bot gets its own screen. `/workspace/shared` syncs to blob storage between sessions, and an optional Linux desktop is driven by eve's `computer_use`. |
+| The computer | One cloud computer per user, shared by all Bots (files, browser sessions, logins); each Bot gets its own screen. `/workspace/shared` syncs to blob storage between sessions. A Linux desktop (Firefox, xterm) driven by eve's `computer_use` runs on Vercel Sandbox and on local Docker, and starts the first time a Bot uses it. |
 | Auto-review | Account-wide. A reviewer model checks risky actions and asks only when needed. The **Review an action** card offers Allow once / Always allow / Deny; Always allow saves a rule. "Ask first" and "Allow automatically" rules live in Settings, and Ask first wins. |
 | Sidebar states | Working ("typing…"), Needs attention (a question or approval), and Unread activity. Pin, hide, mark unread, duplicate, copy conversation ID, delete. ⌘K search, ⌘1–9 jump to a Bot, Alt+↑/↓ to move between Bots. Per-Bot OS notifications when a Bot finishes or needs input. |
 | Logins | An AES-256-GCM vault. `use_login` types credentials into the desktop without the model ever seeing the password. |
@@ -46,7 +46,7 @@ apps/web (Next.js 16)                     agent/ (eve)
 │   autoreview, computer, vault           │                         memory, bash, computer, logins
 └─ withEve() proxies /eve/v1/**           ├─ hooks/                status, auto-reply, group posting, drive sync
                                           ├─ schedules/dispatch.ts every minute: post due routine runs
-lib/ (shared by both)                     └─ sandbox.ts            Vercel Sandbox (desktop) or local sandbox
+lib/ (shared by both)                     └─ sandbox.ts            Vercel Sandbox or local Docker, with a desktop
 ├─ delivery.ts   create sessions, post signed deliveries
 ├─ groups.ts     group fan-out by mention
 ├─ routines.ts   start a run in the Bot's chat
@@ -60,16 +60,21 @@ lib/ (shared by both)                     └─ sandbox.ts            Vercel Sa
 
 ## Run it locally
 
-Requires Node 24 and pnpm.
+Requires Node 24, pnpm, and model access through the Vercel AI Gateway.
 
 ```bash
 pnpm install
-BEZBOT_DEMO_MODEL=1 pnpm dev      # scripted offline model, no credentials needed
+pnpm dev:eve     # once: run /login in the terminal UI and connect your Vercel account (AI Gateway)
+pnpm dev
 ```
 
-Open http://localhost:3000, sign in with any email, and pick a teammate (for example Sales Outbound). Add Research from the Marketplace, then ask Sales Outbound: "Ask Research for the top 5 fintechs hiring RevOps, then draft emails." Open Research to see the request in its own chat, then come back for the reply.
+`/login` saves the model connection in `.eve/provider.json`, and `pnpm dev` reuses it. Alternatively put `AI_GATEWAY_API_KEY` in `.env.local`.
 
-`BEZBOT_DEMO_MODEL=1` swaps in a scripted model (`agent/lib/demo-brain.ts`). It uses the real tools, covering handoffs between Bots in both chats, group chats, memory, routines, skills, and approvals. To use a real model, run `eve link` to connect a Vercel project with AI Gateway access (or set `AI_GATEWAY_API_KEY`), then `pnpm dev`. The model is set in `agent/lib/model.ts`.
+Open http://localhost:3000, create an account with your email and a password, and pick a teammate (for example Sales Outbound). Add Research from the Marketplace, then ask Sales Outbound: "Ask Research for the top 5 fintechs hiring RevOps, then draft emails." Open Research to see the request in its own chat, then come back for the reply.
+
+The model is set in `agent/agent.ts`.
+
+Locally the computer runs in Docker when it's available (otherwise microsandbox or just-bash; just-bash can't run the desktop). The first sandbox build installs the desktop into the template image, which takes a few minutes once.
 
 In development, a ticker in `apps/web/instrumentation.ts` fires the routine dispatcher every minute, because `eve dev` doesn't run cron schedules.
 
@@ -80,7 +85,7 @@ pnpm build     # eve build && next build apps/web
 pnpm start     # starts the built eve runtime (port 4274) and next start
 ```
 
-`BEZBOT_DEMO_MODEL` is read when the agent is compiled, so set it for `pnpm build` too if you want the demo model in a production build. A production runtime refuses to sign cookies or credentials without `BEZBOT_SECRET`, so set it for `pnpm start` as well (for example `BEZBOT_SECRET=$(openssl rand -hex 32) pnpm start`).
+A production runtime refuses to sign cookies or credentials without `BEZBOT_SECRET`, so set it for `pnpm start` as well (for example `BEZBOT_SECRET=$(openssl rand -hex 32) pnpm start`).
 
 ## Deploy to Vercel
 
@@ -93,8 +98,7 @@ Before real users sign in:
 
 1. Set `BEZBOT_SECRET` to 32+ random characters. Every production runtime (preview or production, Vercel or self-hosted) refuses to sign anyone in without it.
 2. Add **Upstash Redis** and **Vercel Blob** from the Vercel Marketplace. Their env vars are picked up automatically. Without them, data lives in the function's `/tmp` and is lost.
-3. Replace the passwordless demo sign-in (`apps/web/app/api/auth/login/route.ts`) with your identity provider. Everything downstream only relies on the signed session cookie.
-4. If Deployment Protection is on, set `VERCEL_AUTOMATION_BYPASS_SECRET` so server-side deliveries can reach the deployment's own `/eve/v1` routes.
+3. If Deployment Protection is on, set `VERCEL_AUTOMATION_BYPASS_SECRET` so server-side deliveries can reach the deployment's own `/eve/v1` routes.
 
 The routine dispatcher becomes a Vercel Cron Job that runs every minute (per-minute crons need a Vercel Pro plan), and the computer runs in Vercel Sandbox with a desktop.
 
@@ -105,11 +109,11 @@ The routine dispatcher becomes a Vercel Cron Job that runs every minute (per-min
 | `BEZBOT_SECRET` (or `AUTH_SECRET`) | Signs session cookies and delivery credentials, and derives the per-user vault key. Required whenever `NODE_ENV=production`, including `pnpm start` and Vercel previews. |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` / `KV_REST_API_TOKEN`) | Durable KV store. Local files under `.data/kv` when unset. |
 | `BLOB_READ_WRITE_TOKEN` | Private Vercel Blob for the shared drive and screenshots. Local files under `.data/blobs` when unset. |
-| `BEZBOT_DEMO_MODEL=1` | Use the scripted offline model. |
+| `AI_GATEWAY_API_KEY` | AI Gateway credential for the model. Not needed on Vercel or when `VERCEL_OIDC_TOKEN` is pulled locally. |
 | `BEZBOT_EVE_ORIGIN` | Where server code reaches `/eve/v1` (defaults: `https://$VERCEL_URL` on Vercel, the dev server in development, `127.0.0.1:4274` for `pnpm start`). |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Lets deliveries through Vercel Deployment Protection. |
 | `BEZBOT_SANDBOX` | `vercel` forces Vercel Sandbox, `default` forces the local sandbox. Default: Vercel Sandbox on Vercel, local elsewhere. |
-| `BEZBOT_DESKTOP=0` | Skip the desktop (no `computer_use`). Shell and files still work. |
+| `BEZBOT_DESKTOP=0` | Skip installing and starting the desktop. Shell and files still work. |
 | `BEZBOT_DEV_TICK=0` | Turn off the development routine ticker. |
 | `BEZBOT_DATA_DIR` | Where local KV and blob files go (default `.data`). |
 | `EVE_NEXT_PRODUCTION_PORT` | Local port for the built eve runtime (default 4274). |
@@ -125,6 +129,7 @@ scripts/start.mjs      local production server (eve runtime + next start)
 
 ## Security notes
 
+- Accounts sign in with email and password (`/api/auth/signup`, `/api/auth/login`). Passwords are hashed with scrypt and a per-password salt, stored apart from the user record, and never returned by the API. Ten failed sign-ins lock an email for 15 minutes. Everything downstream only relies on the signed session cookie, so swapping in an identity provider (Auth.js, Clerk, WorkOS…) only touches those two routes.
 - Every id-addressed eve route (`/eve/v1/session/:id…`) checks that the session belongs to the signed-in user. Browsers can't create sessions; the app creates exactly one per Bot (and one per group seat).
 - Deliveries from server code carry a short-lived HMAC credential tied to one user and Bot, checked against the session registry. A turn's source (teammate, routine, group) comes from that credential, never from message text; the headers you see in messages are display-only.
 - `localDev()` stays in the auth chain so the eve CLI and TUI work during `eve dev`. It is disabled in production, and even in development it can only open sessions that no Bez Bot user owns.

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import type { DeliveryClaims } from "./protocol";
 
 export const SESSION_COOKIE = "bezbot_session";
@@ -67,6 +67,40 @@ export function sessionCookieOptions() {
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Passwords: scrypt with a random salt per password.
+// ---------------------------------------------------------------------------
+
+export const PASSWORD_MIN_LENGTH = 8;
+const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
+
+function scryptKey(password: string, salt: Buffer, params: { N: number; r: number; p: number; keylen: number }): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password.normalize("NFKC"), salt, params.keylen, { N: params.N, r: params.r, p: params.p, maxmem: 64 * 1024 * 1024 }, (err, key) =>
+      err ? reject(err) : resolve(key),
+    );
+  });
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const key = await scryptKey(password, salt, SCRYPT);
+  return `scrypt.${SCRYPT.N}.${SCRYPT.r}.${SCRYPT.p}.${b64url(salt)}.${b64url(key)}`;
+}
+
+export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
+  const [scheme, n, r, p, salt, key] = (stored ?? "").split(".");
+  if (scheme !== "scrypt" || !n || !r || !p || !salt || !key) return false;
+  const expected = Buffer.from(key, "base64url");
+  const actual = await scryptKey(password, Buffer.from(salt, "base64url"), {
+    N: Number(n),
+    r: Number(r),
+    p: Number(p),
+    keylen: expected.length,
+  });
+  return timingSafeEqual(expected, actual);
 }
 
 export function readCookie(header: string | null | undefined, name: string): string | undefined {

@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import type { ApprovalContext } from "eve/tools/approval";
 import { ruleOnlyApproval } from "../lib/approval";
-import { captureScreenshot, hasDesktop } from "../lib/computer";
+import { captureScreenshot, ensureDesktop } from "../lib/computer";
 import { computerUseTool as computer_use } from "../lib/computer-use";
 import { identityForSession } from "../lib/identity";
 
@@ -9,8 +9,8 @@ const INTERACTIVE = new Set(["click", "double_click", "triple_click", "drag", "t
 
 /**
  * The bot's desktop: a browser and terminals it operates with screenshots,
- * clicks, and typing, the way a person uses a computer. Only available on
- * sandboxes with a managed desktop (Vercel Sandbox).
+ * clicks, and typing, the way a person uses a computer. Runs on Vercel
+ * Sandbox and on local Docker; the desktop starts on first use.
  */
 export default defineTool({
   ...computer_use,
@@ -31,11 +31,8 @@ export default defineTool({
   },
   async execute(input, ctx) {
     const sandbox = await ctx.getSandbox();
-    if (!(await hasDesktop(sandbox))) {
-      throw new Error(
-        "This computer has no desktop right now (desktop control runs on Vercel Sandbox). Use bash, web_fetch, and web_search instead.",
-      );
-    }
+    const desktop = await ensureDesktop(sandbox);
+    if (!desktop.ok) throw new Error(desktop.reason);
     // The driver resolves to one result per action (never a stream).
     const result = await (computer_use.execute(input, ctx) as Promise<unknown>);
     const identity = await identityForSession(ctx.session);

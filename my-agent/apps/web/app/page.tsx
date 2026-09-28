@@ -45,7 +45,7 @@ function Feature({
 
 export default async function LandingPage() {
   const user = await currentUser();
-  const primaryHref = user ? "/app" : "/login";
+  const primaryHref = user ? "/app" : "/login?mode=signup";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -233,7 +233,7 @@ export default async function LandingPage() {
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
               <Link
                 className="inline-flex h-12 items-center rounded-full bg-white px-7 text-[15px] font-medium text-black hover:bg-neutral-200"
-                href={user ? "/app/bots/new" : "/login"}
+                href={user ? "/app/bots/new" : "/login?mode=signup"}
               >
                 Get started for free
               </Link>

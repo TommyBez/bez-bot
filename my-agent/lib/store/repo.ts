@@ -86,12 +86,15 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   return id ? getUser(id) : null;
 }
 
-export async function createUser(input: { name: string; email: string; timezone?: string }): Promise<User> {
+/** Creates an account, or returns null when the email is already registered. */
+export async function createUser(input: { name: string; email: string; timezone?: string; passwordHash: string }): Promise<User | null> {
   const email = input.email.trim().toLowerCase();
-  const existing = await findUserByEmail(email);
-  if (existing) return existing;
+  const id = newId("usr");
+  // Claim the email atomically so two sign-ups can't both own it.
+  const owner = await kv().update<string>(`user-email:${email}`, (current) => current ?? id);
+  if (owner !== id) return null;
   const user: User = {
-    id: newId("usr"),
+    id,
     name: input.name.trim() || email.split("@")[0] || "You",
     email,
     createdAt: nowIso(),
@@ -99,9 +102,33 @@ export async function createUser(input: { name: string; email: string; timezone?
     timezone: input.timezone,
     autoReview: DEFAULT_AUTO_REVIEW,
   };
-  await kv().set(`user:${user.id}`, user);
-  await kv().set(`user-email:${email}`, user.id);
+  await kv().set(`user-password:${id}`, input.passwordHash);
+  await kv().set(`user:${id}`, user);
   return user;
+}
+
+/** Kept apart from the User record so no API response can carry it. */
+export async function getPasswordHash(userId: string): Promise<string | null> {
+  return kv().get<string>(`user-password:${userId}`);
+}
+
+const SIGN_IN_WINDOW_MS = 15 * 60_000;
+const SIGN_IN_MAX_FAILURES = 10;
+
+/** True while an email has too many recent failed sign-ins. */
+export async function signInLocked(email: string): Promise<boolean> {
+  const entry = await kv().get<{ failures: number; since: number }>(`signin-failures:${email.trim().toLowerCase()}`);
+  return Boolean(entry && Date.now() - entry.since < SIGN_IN_WINDOW_MS && entry.failures >= SIGN_IN_MAX_FAILURES);
+}
+
+export async function recordSignInFailure(email: string): Promise<void> {
+  await kv().update<{ failures: number; since: number }>(`signin-failures:${email.trim().toLowerCase()}`, (entry) =>
+    entry && Date.now() - entry.since < SIGN_IN_WINDOW_MS ? { ...entry, failures: entry.failures + 1 } : { failures: 1, since: Date.now() },
+  );
+}
+
+export async function clearSignInFailures(email: string): Promise<void> {
+  await kv().del(`signin-failures:${email.trim().toLowerCase()}`);
 }
 
 export async function updateUser(

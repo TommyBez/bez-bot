@@ -11,6 +11,5 @@ export const BRAND = {
   description:
     "Bez Bot is your team of always-on AI teammates. They have their own computer, use it like you do, and never log off.",
   poweredBy: "Built with eve",
-  model: "spacexai/grok-4.7",
   twitter: "@bezbot",
 } as const;

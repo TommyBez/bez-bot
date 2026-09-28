@@ -4,6 +4,7 @@ import { blobs } from "../../lib/store/blobs";
 import { kv } from "../../lib/store/kv";
 import { updateComputer } from "../../lib/store/repo";
 import { nowIso } from "../../lib/ids";
+import { computerUsePaths, installComputerUse, startComputerUse } from "./computer-use";
 
 /**
  * Every bot a user owns shares one computer. Each eve session still gets its
@@ -167,8 +168,61 @@ export async function captureScreenshot(sandbox: SandboxSession, userId: string)
   }
 }
 
-/** Marks a sandbox as having a managed desktop (Vercel Sandbox + computer use). */
-export async function hasDesktop(sandbox: SandboxSession): Promise<boolean> {
-  const result = await sandbox.run({ command: "test -f /workspace/.bezbot/desktop && echo yes || echo no" });
+const NO_DESKTOP_MARKER = "/workspace/.bezbot/no-desktop";
+
+/** Installs the desktop, retrying once: the script downloads from apt, GitHub, and npm. */
+export async function installDesktop(sandbox: SandboxSession): Promise<void> {
+  try {
+    await installComputerUse(sandbox);
+  } catch {
+    await installComputerUse(sandbox);
+  }
+}
+
+export type DesktopStatus = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Starts this computer's desktop (Xvfb, a window manager, Firefox, and the
+ * computer-use driver) if it isn't running. New sandboxes have it installed
+ * from their template (see sandbox.ts). One whose template predates it, or
+ * whose install was cut short, gets it installed on first use, and one whose
+ * container restarted gets its display started again. Hosts that can't run it
+ * at all (no apt or root, e.g. just-bash) are remembered so later calls answer
+ * immediately; other failures are retried on the next call.
+ */
+export async function ensureDesktop(sandbox: SandboxSession): Promise<DesktopStatus> {
+  const fallback = "Use bash, web_fetch, and web_search instead.";
+  if (process.env.BEZBOT_DESKTOP === "0") return { ok: false, reason: `The desktop is turned off on this computer. ${fallback}` };
+  const { driverRoot } = computerUsePaths(sandbox);
+  const probe = await sandbox.run({
+    command: [
+      `test -f ${NO_DESKTOP_MARKER} && echo unavailable`,
+      `command -v Xvfb >/dev/null 2>&1 && test -d '${driverRoot}/node_modules' && echo installed`,
+      `command -v apt-get >/dev/null 2>&1 && { [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; } && echo supported`,
+      "true",
+    ].join("; "),
+  });
+  const unsupported = { ok: false as const, reason: `This computer can't run a desktop (it needs Vercel Sandbox or Docker). ${fallback}` };
+  if (probe.stdout.includes("unavailable")) return unsupported;
+  try {
+    if (!probe.stdout.includes("installed")) {
+      if (!probe.stdout.includes("supported")) {
+        await sandbox.writeTextFile({ path: NO_DESKTOP_MARKER, content: "no apt or root" });
+        return unsupported;
+      }
+      await installDesktop(sandbox);
+    }
+    await startComputerUse(sandbox);
+    return { ok: true };
+  } catch (error) {
+    console.warn("[bezbot] desktop failed to start", error);
+    const detail = (error instanceof Error ? error.message : String(error)).split("\n")[0]!.slice(0, 200);
+    return { ok: false, reason: `The desktop failed to start (${detail}). Try again in a moment, or ${fallback.toLowerCase()}` };
+  }
+}
+
+/** Whether the desktop's display is up right now (without starting it). */
+export async function desktopRunning(sandbox: SandboxSession): Promise<boolean> {
+  const result = await sandbox.run({ command: "DISPLAY=:99 xdpyinfo >/dev/null 2>&1 && echo yes || echo no" });
   return result.stdout.trim() === "yes";
 }

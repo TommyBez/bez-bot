@@ -3,7 +3,7 @@ import { z } from "zod";
 import { decryptSecret } from "../../lib/auth";
 import { listVault, logComputerActivity } from "../../lib/store/repo";
 import { sensitiveApproval } from "../lib/approval";
-import { hasDesktop } from "../lib/computer";
+import { desktopRunning } from "../lib/computer";
 import { requireIdentity } from "../lib/identity";
 
 /**
@@ -28,7 +28,7 @@ export default defineTool({
     const password = decryptSecret(identity.userId, entry.secret);
     const sandbox = await ctx.getSandbox();
 
-    if (await hasDesktop(sandbox)) {
+    if (await desktopRunning(sandbox)) {
       const typeValue = 'xdotool type --clearmodifiers --delay 25 -- "$BEZBOT_VALUE"';
       const steps =
         field === "username"

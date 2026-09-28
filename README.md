@@ -7,5 +7,6 @@ The app lives in [`my-agent/`](my-agent). See [`my-agent/README.md`](my-agent/RE
 ```bash
 cd my-agent
 pnpm install
-BEZBOT_DEMO_MODEL=1 pnpm dev
+pnpm dev:eve   # once: /login to connect the model through the Vercel AI Gateway
+pnpm dev
 ```

@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bez-bot",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "my-agent",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

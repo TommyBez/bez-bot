@@ -95,7 +95,7 @@ function PlanCard({ plan }: { readonly plan: Plan }) {
       <div className="mb-6 text-[13px] text-neutral-500">Billed monthly</div>
       <Link
         className="mb-7 inline-flex h-11 items-center justify-center rounded-full bg-white text-[14px] font-medium text-black hover:bg-neutral-200"
-        href="/login?plan=1"
+        href="/login?mode=signup"
       >
         {tier.cta}
       </Link>

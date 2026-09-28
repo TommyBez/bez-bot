@@ -8,4 +8,5 @@ export {
   installComputerUse,
   startComputerUse,
 } from "../../node_modules/eve/dist/src/extensions/code/extension/lib/computer-use-sandbox.js";
+export { computerUsePaths } from "../../node_modules/eve/dist/src/extensions/code/extension/lib/computer-use.js";
 export { default as computerUseTool } from "../../node_modules/eve/dist/src/extensions/code/extension/tools/computer_use.js";

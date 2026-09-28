@@ -80,9 +80,14 @@ export function MarketingNav({ signedIn }: { readonly signedIn: boolean }) {
           >
             Contact Sales
           </Link>
+          {signedIn ? null : (
+            <Link className="rounded-full px-3 py-2 text-[14px] text-neutral-300 transition-colors hover:text-white" href="/login">
+              Sign in
+            </Link>
+          )}
           <Link
             className="inline-flex h-9 items-center rounded-full bg-white px-4 text-[14px] font-medium text-black transition-colors hover:bg-neutral-200"
-            href={signedIn ? "/app" : "/login"}
+            href={signedIn ? "/app" : "/login?mode=signup"}
           >
             {signedIn ? "Open app" : "Get started"}
           </Link>

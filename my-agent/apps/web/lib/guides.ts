@@ -166,7 +166,7 @@ export const GUIDES: Guide[] = [
       },
       {
         heading: "Terms",
-        body: ["Bez Bot is a demonstration product that clones the structure of Grok Bot. It is not affiliated with xAI or SpaceXAI. Bots are AI systems and can make mistakes; review important work before relying on it."],
+        body: ["Bez Bot clones the structure of Grok Bot. It is not affiliated with xAI or SpaceXAI. Bots are AI systems and can make mistakes; review important work before relying on it."],
       },
     ],
   },

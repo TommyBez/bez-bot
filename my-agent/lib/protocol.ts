@@ -145,15 +145,6 @@ export function formatGroupMessage(header: GroupHeader, lines: { author: string;
   return `<bezbot-group id="${attr(header.groupId)}" name="${attr(header.groupName)}" respond="${header.respond}"/>\n${transcript}`;
 }
 
-export function parseGroupHeader(text: string | null | undefined): (GroupHeader & { body: string }) | null {
-  if (!text) return null;
-  const match = GROUP_RE.exec(text);
-  if (!match) return null;
-  const a = parseAttrs(match[1]!);
-  if (!a.id) return null;
-  return { groupId: a.id, groupName: a.name ?? "Group", respond: a.respond === "must" ? "must" : "maybe", body: text.slice(match[0].length) };
-}
-
 /** Removes machine headers for display. */
 export function stripHeaders(text: string): string {
   return text.replace(TEAMMATE_RE, "").replace(ROUTINE_RE, "").replace(GROUP_RE, "").trim();
