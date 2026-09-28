@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@source "../../../node_modules/streamdown/dist/*.js";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-subtle: var(--subtle);
+  --color-brand: var(--brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-sans-face), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), "Geist Mono", ui-monospace, monospace;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-dot: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* Dark, high-contrast palette in the spirit of x.ai: black canvas, white type, hairline borders. */
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0b0b0c;
+  --card-foreground: #f5f5f5;
+  --popover: #111113;
+  --popover-foreground: #f5f5f5;
+  --primary: #f5f5f5;
+  --primary-foreground: #0a0a0a;
+  --secondary: #17171a;
+  --secondary-foreground: #f5f5f5;
+  --muted: #141416;
+  --muted-foreground: #8b8b92;
+  --accent: #1b1b1f;
+  --accent-foreground: #f5f5f5;
+  --destructive: #f05252;
+  --border: rgb(255 255 255 / 0.09);
+  --input: rgb(255 255 255 / 0.12);
+  --ring: rgb(255 255 255 / 0.3);
+  --surface: #0d0d0f;
+  --surface-2: #151518;
+  --subtle: #5d5d65;
+  --brand: #ffffff;
+  --radius: 0.75rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(255 255 255 / 0.85);
+  color: #000;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes typing {
+  0% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+.typing-dots span {
+  animation: typing 1.4s infinite both;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 40%, #9a9aa3 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, #6b6b73 0%, #f5f5f5 50%, #6b6b73 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.4s linear infinite;
+}
+
+.grid-fade {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+.glow {
+  background: radial-gradient(60% 60% at 50% 0%, rgb(255 255 255 / 0.12) 0%, transparent 70%);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
+}

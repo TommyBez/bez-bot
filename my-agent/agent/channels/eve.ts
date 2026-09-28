@@ -1,15 +1,69 @@
+import { type AuthFn, ForbiddenError, localDev, vercelOidc } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
-import { localDev, placeholderAuth, vercelOidc } from "eve/channels/auth";
+import { readCookie, SESSION_COOKIE, verifySessionToken } from "../../lib/auth";
+import { CONTEXT_HEADER, decodeClientContext } from "../../lib/protocol";
+import { getConversation, getOwnedBot, getSessionContext, getThread, getUser } from "../../lib/store/repo";
+
+/**
+ * Browser traffic arrives through the Next.js app on the same origin, so the
+ * app's signed session cookie identifies the user. The `x-bezbot-context`
+ * header says which bot or thread the conversation belongs to; ownership is
+ * checked here and pinned on the session as `auth.initiator.attributes`.
+ */
+function bezBotSession(): AuthFn<Request> {
+  return async (request) => {
+    const claims = verifySessionToken(readCookie(request.headers.get("cookie"), SESSION_COOKIE));
+    if (!claims) return null;
+    const user = await getUser(claims.uid);
+    if (!user) return null;
+
+    // eve does not enforce session ownership; do it for id-addressed routes.
+    const match = /\/v1\/session\/([^/?]+)/.exec(new URL(request.url).pathname);
+    if (match) {
+      const owner = await getSessionContext(decodeURIComponent(match[1]!));
+      if (owner && owner.userId !== user.id) {
+        throw new ForbiddenError({ message: "This conversation belongs to someone else." });
+      }
+    }
+
+    const attributes: Record<string, string> = { userId: user.id, name: user.name, email: user.email };
+    const context = decodeClientContext(request.headers.get(CONTEXT_HEADER));
+
+    if (context?.mode === "thread" && context.threadId) {
+      const thread = await getThread(context.threadId);
+      if (!thread || thread.userId !== user.id) throw new ForbiddenError({ message: "Unknown thread." });
+      attributes.mode = "thread";
+      attributes.threadId = thread.id;
+      attributes.botId = thread.leadBotId;
+    } else if (context?.botId) {
+      const bot = await getOwnedBot(user.id, context.botId);
+      if (!bot) throw new ForbiddenError({ message: "Unknown bot." });
+      attributes.mode = context.mode === "teach" ? "teach" : "dm";
+      attributes.botId = bot.id;
+      if (context.conversationId) {
+        const conversation = await getConversation(context.conversationId);
+        if (!conversation || conversation.userId !== user.id) {
+          throw new ForbiddenError({ message: "Unknown conversation." });
+        }
+        attributes.conversationId = conversation.id;
+      }
+    }
+
+    return {
+      authenticator: "bezbot",
+      principalId: user.id,
+      principalType: "user",
+      attributes,
+    };
+  };
+}
 
 export default eveChannel({
   auth: [
-    // Lets the eve TUI and your Vercel deployments reach the deployed agent.
+    bezBotSession(),
+    // Lets the eve CLI/TUI reach a deployed agent.
     vercelOidc(),
-    // Open on localhost for `eve dev` and the REPL; ignored in production.
+    // Open on localhost for `eve dev`; ignored in production.
     localDev(),
-    // This placeholder will not allow browser requests in production.
-    // Replace it with your app's auth provider, like Auth.js or Clerk,
-    // or use none() for a public demo.
-    placeholderAuth(),
   ],
 });
