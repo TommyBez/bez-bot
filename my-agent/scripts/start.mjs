@@ -44,7 +44,7 @@ if (!(await isListening())) {
     process.exit(1);
   }
   const p = String(port);
-  run(process.execPath, [entry], { HOST: "127.0.0.1", NITRO_HOST: "127.0.0.1", PORT: p, NITRO_PORT: p });
+  run(process.execPath, [entry], { NODE_ENV: "production", HOST: "127.0.0.1", NITRO_HOST: "127.0.0.1", PORT: p, NITRO_PORT: p });
   for (let i = 0; i < 100 && !(await isListening()); i++) await new Promise((r) => setTimeout(r, 100));
 }
 

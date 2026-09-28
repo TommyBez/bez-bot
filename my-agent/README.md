@@ -80,7 +80,7 @@ pnpm build     # eve build && next build apps/web
 pnpm start     # starts the built eve runtime (port 4274) and next start
 ```
 
-`BEZBOT_DEMO_MODEL` is read when the agent is compiled, so set it for `pnpm build` too if you want the demo model in a production build.
+`BEZBOT_DEMO_MODEL` is read when the agent is compiled, so set it for `pnpm build` too if you want the demo model in a production build. A production runtime refuses to sign cookies or credentials without `BEZBOT_SECRET`, so set it for `pnpm start` as well (for example `BEZBOT_SECRET=$(openssl rand -hex 32) pnpm start`).
 
 ## Deploy to Vercel
 
@@ -91,7 +91,7 @@ eve deploy               # builds the agent and the web app as one project
 
 Before real users sign in:
 
-1. Set `BEZBOT_SECRET` to 32+ random characters. Production deployments refuse to sign anyone in without it.
+1. Set `BEZBOT_SECRET` to 32+ random characters. Every production runtime (preview or production, Vercel or self-hosted) refuses to sign anyone in without it.
 2. Add **Upstash Redis** and **Vercel Blob** from the Vercel Marketplace. Their env vars are picked up automatically. Without them, data lives in the function's `/tmp` and is lost.
 3. Replace the passwordless demo sign-in (`apps/web/app/api/auth/login/route.ts`) with your identity provider. Everything downstream only relies on the signed session cookie.
 4. If Deployment Protection is on, set `VERCEL_AUTOMATION_BYPASS_SECRET` so server-side deliveries can reach the deployment's own `/eve/v1` routes.
@@ -102,7 +102,7 @@ The routine dispatcher becomes a Vercel Cron Job that runs every minute (per-min
 
 | Variable | Purpose |
 | --- | --- |
-| `BEZBOT_SECRET` (or `AUTH_SECRET`) | Signs session cookies and delivery credentials, and derives the per-user vault key. Required in production. |
+| `BEZBOT_SECRET` (or `AUTH_SECRET`) | Signs session cookies and delivery credentials, and derives the per-user vault key. Required whenever `NODE_ENV=production`, including `pnpm start` and Vercel previews. |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` / `KV_REST_API_TOKEN`) | Durable KV store. Local files under `.data/kv` when unset. |
 | `BLOB_READ_WRITE_TOKEN` | Private Vercel Blob for the shared drive and screenshots. Local files under `.data/blobs` when unset. |
 | `BEZBOT_DEMO_MODEL=1` | Use the scripted offline model. |

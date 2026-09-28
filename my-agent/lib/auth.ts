@@ -10,7 +10,11 @@ let warned = false;
 export function appSecret(): string {
   const secret = process.env.BEZBOT_SECRET ?? process.env.AUTH_SECRET;
   if (secret && secret.length >= 16) return secret;
-  if (process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production") {
+  // Fail closed in any production runtime (self-hosted or any Vercel environment):
+  // the fallback below is public, so nothing signed or encrypted with it is safe.
+  const production =
+    process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
+  if (production) {
     throw new Error("Set BEZBOT_SECRET (32+ random characters) before running Bez Bot in production.");
   }
   if (!warned) {

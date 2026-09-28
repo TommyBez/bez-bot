@@ -4,6 +4,7 @@ import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@share
 import { isValidTimeZone } from "@shared/schedule";
 import { createUser, updateUser } from "@shared/store/repo";
 import { bad, json } from "@/lib/http";
+import { safeRedirectPath } from "@/lib/redirect";
 
 const schema = z.object({
   name: z.string().trim().max(80).default(""),
@@ -11,10 +12,6 @@ const schema = z.object({
   timezone: z.string().optional(),
   next: z.string().optional(),
 });
-
-function safeNext(next: string | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/app";
-}
 
 /**
  * Passwordless demo sign-in: an email identifies the workspace. Swap this for
@@ -43,6 +40,6 @@ export async function POST(request: Request) {
   if (!user.timezone && timezone) user = (await updateUser(user.id, { timezone })) ?? user;
   const jar = await cookies();
   jar.set(SESSION_COOKIE, createSessionToken(user.id), sessionCookieOptions());
-  if (isForm) return Response.redirect(new URL(safeNext(body.next), request.url), 303);
+  if (isForm) return Response.redirect(new URL(safeRedirectPath(body.next), request.url), 303);
   return json({ user });
 }

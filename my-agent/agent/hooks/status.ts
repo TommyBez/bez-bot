@@ -127,7 +127,15 @@ export default defineHook({
       const identity = await identityForSession(ctx.session);
       if (!identity) return;
       await setBotStatus(identity.botId, "idle");
-      if (identity.kind === "group" && identity.groupId) await setGroupWorking(identity.groupId, identity.botId, false);
+      if (identity.kind === "group" && identity.groupId) {
+        await setGroupWorking(identity.groupId, identity.botId, false);
+        return;
+      }
+      // A stopped turn still ends its run record and lets a waiting teammate know.
+      if (identity.source === "routine" && identity.routineId && identity.runId) {
+        await finishRoutineRun(identity.routineId, identity.runId, "cancelled");
+      }
+      await replyIfUnanswered(identity, ctx.session.id, "I was stopped before I could finish this.");
     },
   },
 });

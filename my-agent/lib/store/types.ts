@@ -105,7 +105,7 @@ export interface RoutineSchedule {
 export interface RoutineRun {
   id: string;
   trigger: "schedule" | "test" | "webhook";
-  status: "running" | "succeeded" | "failed";
+  status: "running" | "succeeded" | "failed" | "cancelled";
   startedAt: string;
   finishedAt?: string;
 }

@@ -5,7 +5,9 @@ import { sensitiveApproval } from "../lib/approval";
 
 /** Commands that can reach outside the workspace or destroy data go through Auto Review. */
 const RISKY = [
-  /\brm\s+-[a-z]*r[a-z]*f?\b.*(\/|~|\*)/i,
+  // Any recursive delete, whatever the target: `rm -rf shared` wipes the drive as surely as `rm -rf /workspace`.
+  /\brm\b[^|;&\n]*\s(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?=\s|$)/,
+  /\bfind\b[^|;&\n]*\s-delete\b/,
   /\bsudo\b/,
   /\b(curl|wget|http)\b[^|]*\s-(X|d|F|-data|-request)\b/i,
   /\bgit\s+push\b/,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BezLogo } from "@/components/bez/bot-avatar";
+import { safeRedirectPath } from "@/lib/redirect";
 import { currentUser } from "@/lib/session";
 import { LoginForm } from "./login-form";
 
@@ -8,7 +9,7 @@ export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { readonly searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/app";
+  const safeNext = safeRedirectPath(next);
   if (await currentUser()) redirect(safeNext);
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-black px-5">

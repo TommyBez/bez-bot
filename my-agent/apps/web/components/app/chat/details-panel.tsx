@@ -282,8 +282,12 @@ function RoutineDetail({
           <ul className="space-y-1">
             {routine.runs.map((run) => (
               <li className="flex items-center justify-between text-[12.5px]" key={run.id}>
-                <span className={cn(run.status === "failed" ? "text-red-300" : run.status === "running" ? "text-amber-200" : "text-neutral-300")}>
-                  {run.status === "running" ? "Running" : run.status === "succeeded" ? "Succeeded" : "Failed"}
+                <span
+                  className={cn(
+                    run.status === "failed" ? "text-red-300" : run.status === "running" ? "text-amber-200" : run.status === "cancelled" ? "text-neutral-500" : "text-neutral-300",
+                  )}
+                >
+                  {{ running: "Running", succeeded: "Succeeded", failed: "Failed", cancelled: "Cancelled" }[run.status]}
                   <span className="text-neutral-600"> · {run.trigger === "test" ? "Test" : run.trigger === "webhook" ? "Webhook" : "Schedule"}</span>
                 </span>
                 <span className="text-neutral-500">{timeAgo(run.startedAt)}</span>

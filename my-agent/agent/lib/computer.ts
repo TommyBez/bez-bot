@@ -42,6 +42,27 @@ async function listFiles(sandbox: SandboxSession): Promise<string[]> {
     .filter((line) => line.length > 0 && !SKIP.some((re) => re.test(`/${line}`)));
 }
 
+/**
+ * What this sandbox's drive looked like when it was restored (and after each
+ * sync). Changes are measured against it, never against the shared manifest,
+ * which other Bots may have moved on since.
+ */
+const BASELINE_PATH = "/workspace/.bezbot/drive-baseline.json";
+
+async function readBaseline(sandbox: SandboxSession): Promise<Manifest["files"] | null> {
+  try {
+    const raw = await sandbox.readTextFile({ path: BASELINE_PATH });
+    return raw ? (JSON.parse(raw) as Manifest["files"]) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeBaseline(sandbox: SandboxSession, files: Manifest["files"]): Promise<void> {
+  await sandbox.run({ command: "mkdir -p /workspace/.bezbot" });
+  await sandbox.writeTextFile({ path: BASELINE_PATH, content: JSON.stringify(files) });
+}
+
 /** Copies the user's drive into a freshly opened sandbox. */
 export async function restoreSharedDrive(sandbox: SandboxSession, userId: string): Promise<number> {
   const manifest = await kv().get<Manifest>(manifestKey(userId));
@@ -52,23 +73,34 @@ export async function restoreSharedDrive(sandbox: SandboxSession, userId: string
       content:
         "# Shared drive\n\nEverything in this folder is shared by all of your Bots and survives across tasks.\nBots save deliverables, downloads, and notes here.\n",
     });
+    await writeBaseline(sandbox, {});
     return 0;
   }
-  let restored = 0;
-  for (const [relative] of Object.entries(manifest.files)) {
+  const baseline: Manifest["files"] = {};
+  for (const [relative, entry] of Object.entries(manifest.files)) {
     const data = await blobs().get(blobPath(userId, relative));
     if (!data) continue;
     await sandbox.writeBinaryFile({ path: `${SHARED_DIR}/${relative}`, content: data });
-    restored += 1;
+    baseline[relative] = entry;
   }
-  return restored;
+  await writeBaseline(sandbox, baseline);
+  return Object.keys(baseline).length;
 }
 
-/** Uploads changed files from `/workspace/shared` and records a listing for the UI. */
+/**
+ * Uploads what this sandbox changed in `/workspace/shared` since it was
+ * restored, and records a listing for the UI. Files this sandbox never saw
+ * (added or updated by a Bot running at the same time) are left alone.
+ */
 export async function syncSharedDrive(sandbox: SandboxSession, userId: string, sandboxKind: string): Promise<void> {
   const files = await listFiles(sandbox);
-  const previous = (await kv().get<Manifest>(manifestKey(userId))) ?? { files: {}, updatedAt: nowIso() };
-  const next: Manifest = { files: {}, updatedAt: nowIso() };
+  const baseline = await readBaseline(sandbox);
+  const latest = (await kv().get<Manifest>(manifestKey(userId))) ?? { files: {}, updatedAt: nowIso() };
+  // Without a baseline (a sandbox restored before baselines existed), fall back
+  // to the shared manifest for uploads and never delete anything.
+  const reference = baseline ?? latest.files;
+  const current: Manifest["files"] = {};
+  const changed: Manifest["files"] = {};
   let total = 0;
 
   for (const relative of files.slice(0, MAX_FILES)) {
@@ -81,22 +113,28 @@ export async function syncSharedDrive(sandbox: SandboxSession, userId: string, s
     if (!data) continue;
     if (data.byteLength > MAX_FILE_BYTES || total + data.byteLength > MAX_TOTAL_BYTES) continue;
     total += data.byteLength;
-    const hash = createHash("sha1").update(data).digest("hex");
-    next.files[relative] = { size: data.byteLength, hash };
-    if (previous.files[relative]?.hash !== hash) {
+    const entry = { size: data.byteLength, hash: createHash("sha1").update(data).digest("hex") };
+    current[relative] = entry;
+    if (reference[relative]?.hash !== entry.hash) {
       await blobs().put(blobPath(userId, relative), data);
+      changed[relative] = entry;
     }
   }
 
-  // Files deleted in this sandbox are only removed when they existed at restore
-  // time; concurrent bots may have added new files we have not seen yet.
-  const removed = Object.keys(previous.files).filter((p) => !(p in next.files));
-  const merged: Manifest = {
-    files: { ...Object.fromEntries(Object.entries(previous.files).filter(([p]) => !removed.includes(p))), ...next.files },
-    updatedAt: next.updatedAt,
-  };
+  // Deleted here: present in this sandbox's baseline, gone now.
+  const deletedHere = baseline ? Object.keys(baseline).filter((p) => !(p in current)) : [];
+  let removed: string[] = [];
+  const merged = await kv().update<Manifest>(manifestKey(userId), (manifest) => {
+    const files = { ...(manifest?.files ?? {}) };
+    // Only drop a file if nobody else changed it since this sandbox saw it.
+    removed = deletedHere.filter((p) => files[p] && files[p]!.hash === baseline?.[p]?.hash);
+    for (const p of removed) delete files[p];
+    Object.assign(files, changed);
+    return { files, updatedAt: nowIso() };
+  });
   if (removed.length > 0) await blobs().del(removed.map((p) => blobPath(userId, p)));
-  await kv().set(manifestKey(userId), merged);
+  await writeBaseline(sandbox, current);
+  if (!merged) return;
 
   await updateComputer(userId, (state) => ({
     ...state,

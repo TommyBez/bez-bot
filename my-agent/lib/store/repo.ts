@@ -43,10 +43,17 @@ async function loadMany<T>(prefix: string, ids: string[]): Promise<T[]> {
   return rows.filter((row): row is Awaited<T> & T => row !== null);
 }
 
-/** Returns true the first time `key` is claimed; later claims return false. */
+/**
+ * Returns true the first time `key` is claimed; later claims return false.
+ *
+ * `kv().update` may run its callback more than once (Redis retries after a
+ * failed compare-and-set), so every callback below resets whatever it
+ * reports before deciding; only the attempt that was written counts.
+ */
 export async function claimOnce(key: string): Promise<boolean> {
   let won = false;
   await kv().update<string>(`once:${key}`, (existing) => {
+    won = false;
     if (existing) return existing;
     won = true;
     return nowIso();
@@ -108,6 +115,7 @@ export async function updateUser(
 export async function addAutoReviewRule(userId: string, rule: Omit<AutoReviewRule, "id" | "createdAt">): Promise<AutoReviewRule | null> {
   let saved: AutoReviewRule | null = null;
   await kv().update<User>(`user:${userId}`, (u) => {
+    saved = null;
     if (!u) return null;
     const current = withDefaults(u);
     const duplicate = current.autoReview.rules.find(
@@ -586,6 +594,7 @@ export async function claimDueRoutines(options: { now?: Date; limit?: number; le
     if (claimed.length >= limit) break;
     let won = false;
     const routine = await kv().update<Routine>(`routine:${id}`, (r) => {
+      won = false;
       if (!r || !r.enabled || !r.nextRunAt) return r;
       if (new Date(r.nextRunAt).getTime() > now.getTime()) return r;
       if (r.leaseUntil && new Date(r.leaseUntil).getTime() > now.getTime()) return r;
@@ -616,7 +625,7 @@ export async function startRoutineRun(id: string, trigger: RoutineRun["trigger"]
   return run;
 }
 
-export async function finishRoutineRun(id: string, runId: string, status: "succeeded" | "failed"): Promise<void> {
+export async function finishRoutineRun(id: string, runId: string, status: "succeeded" | "failed" | "cancelled"): Promise<void> {
   await kv().update<Routine>(`routine:${id}`, (r) =>
     r
       ? {
@@ -732,6 +741,7 @@ export async function addMemory(
   if (!text) return null;
   let saved: MemoryEntry | null = null;
   await kv().update<MemoryDoc>(memoryKey(userId, botId), (doc) => {
+    saved = null;
     const current = doc ?? { entries: [], version: 0, updatedAt: nowIso() };
     const duplicate = current.entries.find((e) => e.text.toLowerCase() === text.toLowerCase());
     if (duplicate) {
@@ -751,6 +761,7 @@ export async function addMemory(
 export async function removeMemory(userId: string, botId: string, entryId: string): Promise<boolean> {
   let removed = false;
   await kv().update<MemoryDoc>(memoryKey(userId, botId), (doc) => {
+    removed = false;
     if (!doc) return null;
     const entries = doc.entries.filter((e) => e.id !== entryId);
     removed = entries.length !== doc.entries.length;
@@ -800,6 +811,7 @@ export async function consumeBotnetBudget(userId: string, maxPerHour: number): P
   const hour = new Date().toISOString().slice(0, 13);
   let allowed = false;
   await kv().update<{ hour: string; count: number }>(`botnet-budget:${userId}`, (b) => {
+    allowed = false;
     const current = b && b.hour === hour ? b : { hour, count: 0 };
     if (current.count >= maxPerHour) return current;
     allowed = true;
