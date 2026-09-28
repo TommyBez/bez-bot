@@ -4,7 +4,7 @@ import { ArrowRightIcon, CalendarClockIcon, HashIcon, NetworkIcon, PlusIcon } fr
 import Link from "next/link";
 import { useAppState } from "@/components/app/app-state";
 import { AppHeader, AppPage, buttonPrimary, buttonSecondary, Card } from "@/components/app/page-header";
-import { BotAvatar, StatusDot } from "@/components/bez/bot-avatar";
+import { BotAvatar, botStatusLabel, StatusDot } from "@/components/bez/bot-avatar";
 import { timeAgo, usePoll } from "@/lib/client";
 import { FEATURED_TEMPLATES } from "@shared/templates";
 import type { BotnetExchange, BotnetMessage, InboxItem } from "@shared/store/types";
@@ -20,7 +20,7 @@ function Onboarding() {
           Pick a job. Your Bot gets its own computer, remembers how you work, and messages teammates when the work needs them.
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURED_TEMPLATES.map((t) => (
           <Link
             className="group flex flex-col gap-4 rounded-[20px] border border-white/10 bg-[#0a0a0b] p-5 transition-colors hover:border-white/25"
@@ -72,7 +72,7 @@ export function HomeView() {
         title={`Good to see you, ${state.user.name.split(" ")[0]}`}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {state.bots.map((bot) => (
           <Link
             className="group rounded-[20px] border border-white/10 bg-[#0a0a0b] p-5 transition-colors hover:border-white/25"
@@ -83,7 +83,7 @@ export function HomeView() {
               <BotAvatar color={bot.color} emoji={bot.emoji} size="lg" />
               <span className="flex items-center gap-1.5 text-[12px] text-neutral-400">
                 <StatusDot className="size-2 ring-0" status={bot.status} />
-                {bot.status === "working" ? bot.statusText ?? "Working" : bot.status === "waiting" ? "Needs you" : bot.status === "error" ? "Error" : "Idle"}
+                {botStatusLabel(bot.status, bot.statusText)}
               </span>
             </div>
             <div className="text-[15px] text-white">{bot.name}</div>
@@ -93,7 +93,7 @@ export function HomeView() {
         ))}
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-[15px] text-white">

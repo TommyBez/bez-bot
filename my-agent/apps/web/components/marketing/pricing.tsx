@@ -115,7 +115,7 @@ function PlanCard({ plan }: { readonly plan: Plan }) {
 export function Pricing() {
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {PLANS.map((plan) => (
           <PlanCard key={plan.group} plan={plan} />
         ))}

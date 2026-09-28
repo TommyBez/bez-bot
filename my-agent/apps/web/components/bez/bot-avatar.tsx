@@ -40,6 +40,13 @@ export function BotAvatar({
   );
 }
 
+export function botStatusLabel(status: string, text?: string): string {
+  if (status === "working") return text ?? "Working";
+  if (status === "waiting") return text ?? "Needs you";
+  if (status === "error") return "Hit an error";
+  return "Idle";
+}
+
 export function StatusDot({ status, className }: { readonly status: "idle" | "working" | "waiting" | "error"; readonly className?: string }) {
   const colors = {
     idle: "bg-neutral-500",

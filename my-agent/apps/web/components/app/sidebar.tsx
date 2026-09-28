@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ComponentType } from "react";
-import { BezLogo, BotAvatar } from "@/components/bez/bot-avatar";
+import { BezLogo, BotAvatar, botStatusLabel } from "@/components/bez/bot-avatar";
 import { api } from "@/lib/client";
 import { cn } from "@/lib/utils";
 import { useAppState } from "./app-state";
@@ -54,13 +54,6 @@ function NavLink({
       ) : null}
     </Link>
   );
-}
-
-function statusLabel(status: string, text?: string) {
-  if (status === "working") return text ?? "Working";
-  if (status === "waiting") return text ?? "Needs you";
-  if (status === "error") return "Hit an error";
-  return "Idle";
 }
 
 function SidebarContent({ onNavigate }: { readonly onNavigate?: () => void }) {
@@ -120,7 +113,7 @@ function SidebarContent({ onNavigate }: { readonly onNavigate?: () => void }) {
                       bot.status === "working" ? "text-emerald-400/80" : bot.status === "waiting" ? "text-amber-300/80" : "text-neutral-500",
                     )}
                   >
-                    {statusLabel(bot.status, bot.statusText)}
+                    {botStatusLabel(bot.status, bot.statusText)}
                   </span>
                 </span>
               </Link>

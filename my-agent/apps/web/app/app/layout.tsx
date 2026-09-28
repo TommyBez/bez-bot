@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { readonly children: React
     >
       <div className="flex h-dvh overflow-hidden bg-black text-white">
         <Sidebar />
-        <div className="min-w-0 flex-1 overflow-hidden">{children}</div>
+        <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
       </div>
     </AppStateProvider>
   );

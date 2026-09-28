@@ -1,18 +1,21 @@
 import { defineHook } from "eve/hooks";
-import { parseTeammateEnvelope } from "../../lib/protocol";
 import { kv } from "../../lib/store/kv";
-import { registerSession, updateExchange } from "../../lib/store/repo";
+import { getSessionContext, registerSession, updateExchange } from "../../lib/store/repo";
+import { verifiedTeammateEnvelope } from "./identity";
 
 /**
  * Registers each teammate session under the bot named in its envelope, so
  * tools, route auth, and the app can attribute the work to the right bot.
+ * Only signed envelopes count, and a session never moves to another user.
  */
 export default defineHook({
   events: {
     async "message.received"(event, ctx) {
       if (event.data.kind === "execution.background_task") return;
-      const envelope = parseTeammateEnvelope(event.data.message);
+      const envelope = verifiedTeammateEnvelope(event.data.message);
       if (!envelope) return;
+      const existing = await getSessionContext(ctx.session.id);
+      if (existing && existing.userId !== envelope.userId) return;
       await registerSession(
         {
           sessionId: ctx.session.id,

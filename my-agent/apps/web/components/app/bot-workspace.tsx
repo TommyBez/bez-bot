@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppState } from "@/components/app/app-state";
 import { BotChat } from "@/components/app/chat/bot-chat";
-import { BotAvatar } from "@/components/bez/bot-avatar";
+import { BotAvatar, botStatusLabel } from "@/components/bez/bot-avatar";
 import { api, timeAgo } from "@/lib/client";
 import { cn } from "@/lib/utils";
 import { getTemplate } from "@shared/templates";
@@ -110,7 +110,7 @@ export function BotWorkspace({
               <div className="min-w-0">
                 <div className="truncate text-[14px] text-white">{conversation?.title ?? `New task for ${bot.name}`}</div>
                 <div className="truncate text-[11.5px] text-neutral-500">
-                  {bot.name} · {bot.status === "working" ? bot.statusText ?? "Working" : bot.status === "waiting" ? "Needs you" : "Idle"}
+                  {bot.name} · {botStatusLabel(bot.status, bot.statusText)}
                 </div>
               </div>
             </div>

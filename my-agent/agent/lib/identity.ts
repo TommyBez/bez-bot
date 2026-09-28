@@ -1,5 +1,6 @@
 import type { ModelMessage } from "ai";
 import type { SessionAuthContext } from "eve/context";
+import { verifyTeammateEnvelope } from "../../lib/auth";
 import { parseRoutineMarker, parseTeammateEnvelope, type TeammateEnvelope } from "../../lib/protocol";
 import { getSessionContext } from "../../lib/store/repo";
 import type { SessionContextRecord } from "../../lib/store/types";
@@ -49,11 +50,17 @@ export function messageText(message: ModelMessage): string {
 }
 
 /** The most recent teammate envelope in the visible history (teammate sessions only). */
+/** A teammate envelope minted by `message_bot`; unsigned or tampered ones are ignored. */
+export function verifiedTeammateEnvelope(text: string | null | undefined): TeammateEnvelope | null {
+  const envelope = parseTeammateEnvelope(text);
+  return envelope && verifyTeammateEnvelope(envelope) ? envelope : null;
+}
+
 export function envelopeFromMessages(messages: readonly ModelMessage[]): TeammateEnvelope | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i]!;
     if (message.role !== "user") continue;
-    const envelope = parseTeammateEnvelope(messageText(message));
+    const envelope = verifiedTeammateEnvelope(messageText(message));
     if (envelope) return envelope;
   }
   return null;

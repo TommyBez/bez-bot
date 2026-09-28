@@ -75,7 +75,7 @@ export default function RoutinesPage() {
 
       {creating ? (
         <Card className="mb-6 space-y-4 p-5">
-          <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
             <select className={inputClass} onChange={(e) => setBotId(e.target.value)} value={botId}>
               {state.bots.map((b) => (
                 <option key={b.id} value={b.id}>

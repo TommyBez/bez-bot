@@ -1,7 +1,8 @@
 import { defineWorkflowTool, type WorkflowStepToolContext } from "eve/tools";
 import { z } from "zod";
+import { signTeammateEnvelope } from "../../../lib/auth";
 import { buildPersona } from "../../../lib/persona";
-import { BOTNET_MAX_PER_HOUR, formatTeammateMessage, MAX_TEAMMATE_DEPTH } from "../../../lib/protocol";
+import { BOTNET_MAX_PER_HOUR, formatTeammateMessage, MAX_TEAMMATE_DEPTH, type TeammateEnvelope } from "../../../lib/protocol";
 import {
   appendBotnetMessage,
   consumeBotnetBudget,
@@ -116,6 +117,15 @@ async function planHandoff(
         depth: identity.depth + 1,
       });
 
+  const envelope: TeammateEnvelope = {
+    userId: identity.userId,
+    botId: target.id,
+    fromBotId: self.id,
+    exchangeId,
+    depth: identity.depth + 1,
+    threadId: identity.threadId,
+  };
+
   return {
     ok: true,
     exchangeId,
@@ -125,19 +135,7 @@ async function planHandoff(
     toName: target.name,
     userId: identity.userId,
     agentId,
-    envelopeMessage: formatTeammateMessage(
-      {
-        userId: identity.userId,
-        botId: target.id,
-        fromBotId: self.id,
-        exchangeId,
-        depth: identity.depth + 1,
-        threadId: identity.threadId,
-      },
-      self.name,
-      input.message,
-      persona,
-    ),
+    envelopeMessage: formatTeammateMessage({ ...envelope, sig: signTeammateEnvelope(envelope) }, self.name, input.message, persona),
   };
 }
 

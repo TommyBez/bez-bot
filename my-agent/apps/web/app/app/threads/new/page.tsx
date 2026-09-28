@@ -64,7 +64,7 @@ export default function NewThreadPage() {
         </label>
         <div className="space-y-2">
           <span className="text-[13px] text-neutral-400">Bots in this thread · the crown marks the lead who coordinates</span>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {state.bots.map((bot) => {
               const selected = members.includes(bot.id);
               return (

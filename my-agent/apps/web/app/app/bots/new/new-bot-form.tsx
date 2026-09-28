@@ -68,7 +68,7 @@ export function NewBotForm({ initialTemplateId }: { readonly initialTemplateId: 
   return (
     <AppPage wide>
       <AppHeader body="Give it a job. You can change everything later." title="Create a Bot" />
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           <Card className="p-5">
             <h2 className="mb-4 text-[14px] text-neutral-300">Start from a job</h2>
@@ -94,7 +94,7 @@ export function NewBotForm({ initialTemplateId }: { readonly initialTemplateId: 
           </Card>
 
           <Card className="space-y-4 p-5">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="space-y-1.5">
                 <span className="text-[13px] text-neutral-400">Name</span>
                 <input className={inputClass} onChange={(e) => setName(e.target.value)} placeholder="e.g. Account Manager" value={name} />
@@ -147,7 +147,7 @@ export function NewBotForm({ initialTemplateId }: { readonly initialTemplateId: 
               <div className="text-[14px] text-white">Auto Review</div>
               <div className="text-[13px] text-neutral-500">What happens before a sensitive action (sending, spending, deleting).</div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {(
                 [
                   ["auto", "Auto Review", "A reviewer model checks each action and asks you only when it's risky."],

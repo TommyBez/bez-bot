@@ -177,7 +177,7 @@ export default async function LandingPage() {
               <h2 className="text-4xl font-medium tracking-tight text-white">Download Bez Bot</h2>
               <p className="text-[17px] text-neutral-400">One team, wherever you are — on your desk and in your pocket.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 { icon: GlobeIcon, title: "Web", detail: "Any browser", href: primaryHref, cta: "Open" },
                 { icon: MonitorIcon, title: "Desktop", detail: "Install as an app", href: "/download", cta: "Install" },

@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { type TeammateEnvelope, teammateEnvelopePayload } from "./protocol";
 
 export const SESSION_COOKIE = "bezbot_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -82,6 +83,18 @@ export function verifyInternalToken(purpose: string, token: string | null | unde
   if (!token) return false;
   const expected = Buffer.from(internalToken(purpose));
   const actual = Buffer.from(token);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+/** Signs a teammate envelope so message text can't claim another user or bot. */
+export function signTeammateEnvelope(envelope: TeammateEnvelope): string {
+  return createHmac("sha256", appSecret()).update(teammateEnvelopePayload(envelope)).digest("base64url");
+}
+
+export function verifyTeammateEnvelope(envelope: TeammateEnvelope): boolean {
+  if (!envelope.sig) return false;
+  const expected = Buffer.from(signTeammateEnvelope(envelope));
+  const actual = Buffer.from(envelope.sig);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 

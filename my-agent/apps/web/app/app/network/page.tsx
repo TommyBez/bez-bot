@@ -74,7 +74,7 @@ function NetworkView() {
               </button>
             ))}
           </div>
-          <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
             <Card className="scrollbar-thin max-h-[70vh] overflow-y-auto p-2">
               <ul className="space-y-0.5">
                 {exchanges.map((x) => {

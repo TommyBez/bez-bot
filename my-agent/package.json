@@ -13,7 +13,7 @@
     "build": "eve build && next build apps/web",
     "build:eve": "eve build",
     "build:web": "next build apps/web",
-    "start": "next start apps/web",
+    "start": "node scripts/start.mjs",
     "deploy": "eve deploy",
     "eval": "eve eval",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json"

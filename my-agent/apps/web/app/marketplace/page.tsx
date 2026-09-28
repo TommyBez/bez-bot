@@ -18,7 +18,7 @@ export default function MarketplacePage() {
         {categories.map((category) => (
           <section key={category}>
             <h2 className="mb-5 text-[15px] font-medium text-neutral-400">{category}</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {TEMPLATES.filter((t) => t.category === category).map((template) => (
                 <Link
                   className="group relative flex flex-col justify-between gap-8 overflow-hidden rounded-[24px] border border-white/10 bg-[#0a0a0b] p-6 transition-colors hover:border-white/25"

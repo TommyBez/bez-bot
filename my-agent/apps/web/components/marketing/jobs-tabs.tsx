@@ -11,7 +11,7 @@ export function JobsTabs() {
   const [activeId, setActiveId] = useState(FEATURED_TEMPLATES[0]!.id);
   const active = FEATURED_TEMPLATES.find((t) => t.id === activeId) ?? FEATURED_TEMPLATES[0]!;
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0" role="tablist">
         {FEATURED_TEMPLATES.map((template) => (
           <button

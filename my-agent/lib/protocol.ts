@@ -47,6 +47,13 @@ export interface TeammateEnvelope {
   exchangeId: string;
   depth: number;
   threadId?: string;
+  /** HMAC over {@link teammateEnvelopePayload}, minted by server code only. */
+  sig?: string;
+}
+
+/** Canonical string the envelope signature covers. */
+export function teammateEnvelopePayload(envelope: TeammateEnvelope): string {
+  return ["teammate", envelope.userId, envelope.botId, envelope.fromBotId, envelope.exchangeId, envelope.depth, envelope.threadId ?? ""].join("|");
 }
 
 const ENVELOPE_RE = /<bezbot-teammate\s+([^>]*)\/>/;
@@ -79,6 +86,7 @@ export function parseTeammateEnvelope(text: string | null | undefined): Teammate
     exchangeId: attrs.exchangeId,
     depth: Number(attrs.depth ?? "1") || 1,
     threadId: attrs.threadId || undefined,
+    sig: attrs.sig || undefined,
   };
 }
 

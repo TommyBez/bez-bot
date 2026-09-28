@@ -133,7 +133,7 @@ export async function buildPersona(input: PersonaInput): Promise<string | null> 
 
   if (input.mode === "routine" && input.routineId) {
     const routine = await getRoutine(input.routineId);
-    if (routine) {
+    if (routine && routine.userId === input.userId && routine.botId === input.botId) {
       sections.push(
         [
           `## Scheduled run: ${routine.name}`,

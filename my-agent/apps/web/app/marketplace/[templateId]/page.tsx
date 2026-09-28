@@ -47,7 +47,7 @@ export default async function TemplatePage({ params }: { readonly params: Promis
             </Link>
           </div>
 
-          <div className="mt-14 grid gap-4 sm:grid-cols-2">
+          <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <section className="rounded-[24px] border border-white/10 bg-[#0a0a0b] p-6">
               <h2 className="mb-4 flex items-center gap-2 text-[15px] text-white">
                 <MessagesSquareIcon className="size-4 text-neutral-500" /> Try asking

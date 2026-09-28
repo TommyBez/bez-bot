@@ -86,7 +86,7 @@ export function BotSettings({ bot }: { readonly bot: Bot }) {
 
         <Card className="space-y-3 p-5">
           <div className="text-[14px] text-white">Auto Review</div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(
               [
                 ["auto", "Auto Review", "Reviewer model asks you only when an action is risky."],

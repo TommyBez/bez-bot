@@ -4,6 +4,29 @@ import { readCookie, SESSION_COOKIE, verifySessionToken } from "../../lib/auth";
 import { CONTEXT_HEADER, decodeClientContext } from "../../lib/protocol";
 import { getConversation, getOwnedBot, getSessionContext, getThread, getUser } from "../../lib/store/repo";
 
+function sessionIdFromUrl(request: Request): string | undefined {
+  const match = /\/v1\/session\/([^/?]+)/.exec(new URL(request.url).pathname);
+  return match ? decodeURIComponent(match[1]!) : undefined;
+}
+
+/**
+ * `localDev()` lets the eve CLI/TUI in during `eve dev`, but it would also let
+ * a cookieless request read any user's session. Keep it to sessions no Bez Bot
+ * user owns.
+ */
+function localDevUnowned(): AuthFn<Request> {
+  const fallback = localDev();
+  return async (request) => {
+    const principal = await fallback(request);
+    if (!principal) return principal;
+    const sessionId = sessionIdFromUrl(request);
+    if (sessionId && (await getSessionContext(sessionId))) {
+      throw new ForbiddenError({ message: "Sign in to open this conversation." });
+    }
+    return principal;
+  };
+}
+
 /**
  * Browser traffic arrives through the Next.js app on the same origin, so the
  * app's signed session cookie identifies the user. The `x-bezbot-context`
@@ -18,9 +41,9 @@ function bezBotSession(): AuthFn<Request> {
     if (!user) return null;
 
     // eve does not enforce session ownership; do it for id-addressed routes.
-    const match = /\/v1\/session\/([^/?]+)/.exec(new URL(request.url).pathname);
-    if (match) {
-      const owner = await getSessionContext(decodeURIComponent(match[1]!));
+    const sessionId = sessionIdFromUrl(request);
+    if (sessionId) {
+      const owner = await getSessionContext(sessionId);
       if (owner && owner.userId !== user.id) {
         throw new ForbiddenError({ message: "This conversation belongs to someone else." });
       }
@@ -64,6 +87,6 @@ export default eveChannel({
     // Lets the eve CLI/TUI reach a deployed agent.
     vercelOidc(),
     // Open on localhost for `eve dev`; ignored in production.
-    localDev(),
+    localDevUnowned(),
   ],
 });

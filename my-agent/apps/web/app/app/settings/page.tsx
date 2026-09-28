@@ -18,7 +18,7 @@ function Profile() {
   return (
     <Card className="space-y-4 p-5">
       <div className="text-[14.5px] text-white">Profile</div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="space-y-1.5">
           <span className="text-[13px] text-neutral-400">Name</span>
           <input className={inputClass} onChange={(e) => setName(e.target.value)} value={name} />
