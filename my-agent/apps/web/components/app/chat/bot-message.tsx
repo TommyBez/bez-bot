@@ -2,7 +2,9 @@
 
 import type { EveDynamicToolPart, EveMessage, EveMessageInputRequest, EveMessagePart } from "eve/react";
 import {
-  BellIcon,
+  AlarmClockIcon,
+  ArrowUpRightIcon,
+  BookOpenIcon,
   BrainIcon,
   CalendarPlusIcon,
   CheckIcon,
@@ -13,17 +15,20 @@ import {
   Loader2Icon,
   MonitorIcon,
   SearchIcon,
+  ShieldCheckIcon,
   TerminalIcon,
+  UserPlusIcon,
   XIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useState, type ComponentType } from "react";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { BotAvatar } from "@/components/bez/bot-avatar";
+import { api } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { stripTeammateEnvelope } from "@shared/protocol";
-import type { Bot, BotnetExchange, BotnetMessage } from "@shared/store/types";
-
-export type ExchangeView = BotnetExchange & { messages: BotnetMessage[] };
+import { actionSummary, actionTitle, proposeRuleMatch } from "@shared/actions";
+import { parseRoutineHeader, parseTeammateHeader, stripHeaders } from "@shared/protocol";
+import type { Bot } from "@shared/store/types";
 
 export interface InputResponse {
   readonly optionId?: string;
@@ -34,13 +39,17 @@ export interface InputResponse {
 export interface MessageContext {
   readonly bots: Bot[];
   readonly speaker?: Bot;
-  readonly exchanges: ExchangeView[];
   readonly canRespond: boolean;
   readonly onInputResponses: (responses: readonly InputResponse[]) => void | Promise<void>;
 }
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function findBot(bots: Bot[], ref: unknown): Bot | undefined {
+  const needle = str(ref).replace(/^@/, "").toLowerCase();
+  return bots.find((b) => b.id === ref || b.name.toLowerCase() === needle);
 }
 
 function describeTool(part: EveDynamicToolPart): { icon: ComponentType<{ className?: string }>; label: string; detail?: string } {
@@ -66,18 +75,21 @@ function describeTool(part: EveDynamicToolPart): { icon: ComponentType<{ classNa
       };
     }
     case "remember":
-      return { icon: BrainIcon, label: input.scope === "team" ? "Updated team memory" : "Updated memory", detail: str(input.text) };
+      return { icon: BrainIcon, label: "Updated memory", detail: str(input.text) };
     case "forget":
       return { icon: BrainIcon, label: "Removed a memory" };
     case "save_routine":
-      return { icon: CalendarPlusIcon, label: `Saved routine “${str(input.name)}”` };
+      return { icon: CalendarPlusIcon, label: `Created routine “${str(input.name)}”` };
     case "update_routine":
-    case "run_routine":
+      return { icon: CalendarPlusIcon, label: "Updated a routine" };
     case "list_routines":
+      return { icon: CalendarPlusIcon, label: "Checked routines" };
     case "delete_routine":
-      return { icon: CalendarPlusIcon, label: part.toolName.replace("_", " ").replace(/^\w/, (c) => c.toUpperCase()) };
-    case "notify_user":
-      return { icon: BellIcon, label: "Sent you a notification", detail: str(input.title) };
+      return { icon: CalendarPlusIcon, label: "Deleted a routine" };
+    case "save_skill":
+      return { icon: BookOpenIcon, label: input.draft ? `Drafted skill “${str(input.name)}”` : `Saved skill “${str(input.name)}”` };
+    case "use_skill":
+      return { icon: BookOpenIcon, label: "Used a skill", detail: str(input.name) };
     case "list_logins":
       return { icon: KeyRoundIcon, label: "Checked saved logins" };
     case "use_login":
@@ -89,13 +101,69 @@ function describeTool(part: EveDynamicToolPart): { icon: ComponentType<{ classNa
   }
 }
 
+/** "Review an action": Allow once, Always allow (saves a rule), or Deny. */
+function ReviewAction({ part, request, ctx }: { readonly part: EveDynamicToolPart; readonly request: EveMessageInputRequest; readonly ctx: MessageContext }) {
+  const [pending, setPending] = useState<string>();
+  const options = request.options ?? [];
+  const deny = options.find((o) => o.style === "danger" || /deny|reject|cancel/i.test(o.label));
+  const allow = options.find((o) => o !== deny);
+  const summary = actionSummary(part.toolName, part.input);
+
+  async function answer(kind: "once" | "always" | "deny") {
+    const option = kind === "deny" ? deny : allow;
+    if (!option) return;
+    setPending(kind);
+    try {
+      if (kind === "always") {
+        await api("/api/autoreview", {
+          method: "POST",
+          json: { kind: "allow", tool: part.toolName, match: proposeRuleMatch(part.toolName, part.input) },
+        }).catch(() => undefined);
+      }
+      await ctx.onInputResponses([{ requestId: request.requestId, optionId: option.id }]);
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  const button = "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[12.5px] transition-colors disabled:opacity-50";
+  return (
+    <div className="space-y-2.5 border-t border-amber-400/20 px-3.5 py-3">
+      <div className="flex items-center gap-2 text-[13px] font-medium text-amber-100">
+        <ShieldCheckIcon className="size-4" /> Review an action
+      </div>
+      <div className="text-[12.5px] text-neutral-300">
+        {actionTitle(part.toolName)}
+        {summary && part.toolName !== "use_login" ? (
+          <code className="mt-1 block rounded-lg bg-black/50 px-2 py-1.5 font-mono text-[11.5px] break-all text-neutral-400">{summary}</code>
+        ) : null}
+      </div>
+      {request.prompt ? <p className="text-[12px] text-neutral-500">{request.prompt}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button className={cn(button, "bg-white font-medium text-black hover:bg-neutral-200")} disabled={!ctx.canRespond || !!pending} onClick={() => void answer("once")} type="button">
+          {pending === "once" ? <Loader2Icon className="size-3 animate-spin" /> : null}Allow once
+        </button>
+        <button className={cn(button, "border border-white/15 text-white hover:bg-white/[0.06]")} disabled={!ctx.canRespond || !!pending} onClick={() => void answer("always")} type="button">
+          {pending === "always" ? <Loader2Icon className="size-3 animate-spin" /> : null}Always allow
+        </button>
+        <button className={cn(button, "text-neutral-400 hover:bg-white/[0.06] hover:text-white")} disabled={!ctx.canRespond || !!pending} onClick={() => void answer("deny")} type="button">
+          {pending === "deny" ? <Loader2Icon className="size-3 animate-spin" /> : null}Deny
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ToolRow({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ctx: MessageContext }) {
   const [open, setOpen] = useState(false);
-  const { icon: Icon, label, detail } = describeTool(part);
+  const described = describeTool(part);
+  const { icon: Icon, detail } = described;
   const running = part.state === "input-streaming" || part.state === "input-available" || part.state === "approval-responded";
   const failed = part.state === "output-error" || part.state === "output-denied";
   const inputRequest = part.toolMetadata?.eve?.inputRequest;
   const needsApproval = part.state === "approval-requested" && inputRequest;
+  // Until it runs, say what the Bot wants to do rather than what it did.
+  const label = needsApproval ? `Wants to ${actionTitle(part.toolName).toLowerCase()}` : failed && part.state === "output-denied" ? `Didn't ${actionTitle(part.toolName).toLowerCase()}` : described.label;
 
   return (
     <div className={cn("rounded-2xl border", needsApproval ? "border-amber-400/30 bg-amber-400/[0.05]" : "border-white/[0.07] bg-white/[0.02]")}>
@@ -113,7 +181,7 @@ function ToolRow({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ct
           ) : null}
         </span>
       </button>
-      {needsApproval ? <ApprovalActions ctx={ctx} request={inputRequest} /> : null}
+      {needsApproval ? <ReviewAction ctx={ctx} part={part} request={inputRequest} /> : null}
       {open ? (
         <div className="space-y-2 border-t border-white/[0.06] px-3 py-2.5">
           <pre className="scrollbar-thin max-h-48 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[11px] leading-relaxed text-neutral-400">
@@ -128,41 +196,6 @@ function ToolRow({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ct
           {part.state === "output-denied" ? <p className="text-[12px] text-amber-300">Denied{part.approval.reason ? `: ${part.approval.reason}` : ""}</p> : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function ApprovalActions({ request, ctx }: { readonly request: EveMessageInputRequest; readonly ctx: MessageContext }) {
-  const [pending, setPending] = useState<string>();
-  return (
-    <div className="space-y-2 border-t border-amber-400/20 px-3 py-2.5">
-      <p className="text-[12.5px] text-amber-100/90">{request.prompt}</p>
-      <div className="flex flex-wrap gap-2">
-        {(request.options ?? []).map((option) => (
-          <button
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[12.5px] transition-colors disabled:opacity-50",
-              option.style === "danger" || /deny|cancel|reject/i.test(option.label)
-                ? "border border-white/15 text-neutral-300 hover:bg-white/[0.06]"
-                : "bg-white font-medium text-black hover:bg-neutral-200",
-            )}
-            disabled={!ctx.canRespond || pending !== undefined}
-            key={option.id}
-            onClick={async () => {
-              setPending(option.id);
-              try {
-                await ctx.onInputResponses([{ requestId: request.requestId, optionId: option.id }]);
-              } finally {
-                setPending(undefined);
-              }
-            }}
-            type="button"
-          >
-            {pending === option.id ? <Loader2Icon className="size-3 animate-spin" /> : null}
-            {option.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -223,56 +256,55 @@ function QuestionCard({ request, answered, ctx }: { readonly request: EveMessage
   );
 }
 
-/** "Asking Research…" chip plus the teammate's reply, rendered as that bot's own message. */
-function TeammateHandoff({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ctx: MessageContext }) {
-  const input = (part.input ?? {}) as { to?: string; message?: string; conversationId?: string };
-  const target = ctx.bots.find(
-    (b) => b.id === input.to || b.name.toLowerCase() === String(input.to ?? "").replace(/^@/, "").toLowerCase(),
-  );
-  const firstLine = String(input.message ?? "").split("\n")[0]!.slice(0, 140);
-  const exchange = ctx.exchanges.find(
-    (x) => (input.conversationId ? x.id === input.conversationId : x.subject === firstLine) && (!target || x.toBotId === target.id),
-  );
-  const reply = exchange?.messages.filter((m) => m.kind !== "request" && m.fromBotId === exchange.toBotId).at(-1);
-  const refused =
-    part.state === "output-available" && part.output && typeof part.output === "object" && (part.output as { delivered?: boolean }).delivered === false;
-  const working = !refused && (!exchange || exchange.status === "working");
-  const name = target?.name ?? String(input.to ?? "teammate");
-
+/** A message this Bot sent to a teammate. The teammate's reply arrives later in this chat. */
+function Handoff({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ctx: MessageContext }) {
+  const [open, setOpen] = useState(false);
+  const input = (part.input ?? {}) as { to?: string; message?: string };
+  const target = findBot(ctx.bots, input.to);
+  const name = target?.name ?? str(input.to).replace(/^@/, "") ?? "teammate";
+  const output = (part.state === "output-available" && part.output && typeof part.output === "object" ? part.output : {}) as {
+    sent?: boolean;
+    error?: string;
+  };
+  const failed = part.state === "output-error" || output.sent === false;
+  const sending = !failed && part.state !== "output-available";
   return (
-    <div className="space-y-2">
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] py-1 pr-3 pl-1">
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02]">
+      <button className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left" onClick={() => setOpen((v) => !v)} type="button">
         <BotAvatar color={target?.color} emoji={target?.emoji} name={name} size="xs" />
-        <span className="text-[12.5px] text-neutral-300">
-          {refused ? `Couldn't reach ${name}` : working ? `Asking ${name}` : `${name} replied`}
-        </span>
-        {working ? (
-          <span className="typing-dots flex gap-0.5 text-[10px] text-neutral-500">
-            <span>●</span>
-            <span>●</span>
-            <span>●</span>
-          </span>
-        ) : refused ? (
-          <XIcon className="size-3 text-red-400" />
-        ) : (
-          <CheckIcon className="size-3 text-emerald-400" />
-        )}
-      </div>
-      {refused ? (
-        <p className="pl-2 text-[12px] text-neutral-500">{String((part.output as { error?: string }).error ?? "")}</p>
-      ) : null}
-      {reply ? (
-        <div className="flex gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
-          <BotAvatar color={target?.color} emoji={target?.emoji} name={name} size="sm" />
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 text-[12px] text-neutral-500">
-              {name} <span className="text-neutral-700">→</span> {ctx.speaker?.name ?? "you"}
-            </div>
-            <div className="text-[13.5px] text-neutral-200">
-              <MessageResponse>{stripTeammateEnvelope(reply.text)}</MessageResponse>
-            </div>
-          </div>
+        <span className="text-[12.5px] text-neutral-300">{failed ? `Couldn't message ${name}` : sending ? `Messaging ${name}…` : `Messaged ${name}`}</span>
+        <span className="min-w-0 flex-1 truncate text-[12px] text-neutral-500">{str(input.message).split("\n")[0]}</span>
+        {sending ? <Loader2Icon className="size-3.5 animate-spin text-neutral-500" /> : failed ? <XIcon className="size-3.5 text-red-400" /> : <CheckIcon className="size-3.5 text-neutral-600" />}
+      </button>
+      {open ? (
+        <div className="space-y-2 border-t border-white/[0.06] px-3 py-2.5 text-[13px] text-neutral-300">
+          <MessageResponse>{str(input.message)}</MessageResponse>
+          {failed ? <p className="text-[12px] text-red-400">{output.error ?? (part.state === "output-error" ? part.errorText : "")}</p> : null}
         </div>
+      ) : null}
+      {target && !failed ? (
+        <Link className="flex items-center gap-1 border-t border-white/[0.06] px-3 py-1.5 text-[11.5px] text-neutral-500 hover:text-white" href={`/app/bots/${target.id}`}>
+          Open {target.name}'s chat <ArrowUpRightIcon className="size-3" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function CreatedBot({ part, ctx }: { readonly part: EveDynamicToolPart; readonly ctx: MessageContext }) {
+  const output = (part.state === "output-available" && part.output && typeof part.output === "object" ? part.output : {}) as { id?: string; name?: string };
+  const bot = output.id ? ctx.bots.find((b) => b.id === output.id) : undefined;
+  if (part.state === "approval-requested") return <ToolRow ctx={ctx} part={part} />;
+  return (
+    <div className="flex items-center gap-2.5 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3 py-2">
+      <UserPlusIcon className="size-3.5 text-neutral-500" />
+      <span className="text-[12.5px] text-neutral-300">
+        {output.id ? `Created ${output.name ?? "a Bot"}` : `Creating ${str((part.input as { name?: string } | undefined)?.name)}…`}
+      </span>
+      {bot ? (
+        <Link className="ml-auto inline-flex items-center gap-1 text-[12px] text-neutral-400 hover:text-white" href={`/app/bots/${bot.id}`}>
+          Open <ArrowUpRightIcon className="size-3" />
+        </Link>
       ) : null}
     </div>
   );
@@ -331,10 +363,58 @@ function Part({ part, ctx, streaming }: { readonly part: EveMessagePart; readonl
       if (request?.kind === "question") {
         return <QuestionCard answered={part.toolMetadata?.eve?.inputResponse} ctx={ctx} request={request} />;
       }
-      if (part.toolName === "message_bot") return <TeammateHandoff ctx={ctx} part={part} />;
+      if (part.toolName === "message_bot") return <Handoff ctx={ctx} part={part} />;
+      if (part.toolName === "create_bot") return <CreatedBot ctx={ctx} part={part} />;
       return <ToolRow ctx={ctx} part={part} />;
     }
   }
+}
+
+/** A teammate's message, shown as that Bot talking in this chat. */
+function IncomingTeammate({ header, ctx }: { readonly header: NonNullable<ReturnType<typeof parseTeammateHeader>>; readonly ctx: MessageContext }) {
+  const from = ctx.bots.find((b) => b.id === header.fromBotId);
+  const name = from?.name ?? header.fromName;
+  return (
+    <div className="flex gap-3">
+      <BotAvatar className="mt-0.5" color={from?.color} emoji={from?.emoji} name={name} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center gap-1.5 text-[12px] text-neutral-500">
+          {from ? (
+            <Link className="text-neutral-300 hover:text-white" href={`/app/bots/${from.id}`}>
+              {name}
+            </Link>
+          ) : (
+            <span className="text-neutral-300">{name}</span>
+          )}
+          <span>{header.kind === "reply" ? "replied" : "sent a message"}</span>
+        </div>
+        <div className="rounded-2xl rounded-tl-md border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-[14px] text-neutral-100">
+          <MessageResponse>{header.body}</MessageResponse>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoutineRunRow({ header }: { readonly header: NonNullable<ReturnType<typeof parseRoutineHeader>> }) {
+  const [open, setOpen] = useState(false);
+  const trigger = header.trigger === "test" ? "Test run" : header.trigger === "webhook" ? "Webhook" : "Scheduled run";
+  return (
+    <div className="flex flex-col items-center">
+      <button
+        className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] px-3 py-1 text-[12px] text-neutral-400 hover:text-neutral-200"
+        onClick={() => setOpen((v) => !v)}
+        type="button"
+      >
+        <AlarmClockIcon className="size-3.5" /> {header.name} · {trigger}
+      </button>
+      {open ? (
+        <div className="mt-2 w-full max-w-xl rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-neutral-400">
+          <MessageResponse>{header.body}</MessageResponse>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function BotMessage({
@@ -349,10 +429,13 @@ export function BotMessage({
   readonly userName: string;
 }) {
   if (message.role === "user") {
-    const texts = message.parts.filter((p) => p.type === "text").map((p) => (p.type === "text" ? p.text : ""));
+    const raw = message.parts.filter((p) => p.type === "text").map((p) => (p.type === "text" ? p.text : "")).join("\n");
+    const teammate = parseTeammateHeader(raw);
+    if (teammate) return <IncomingTeammate ctx={ctx} header={teammate} />;
+    const routine = parseRoutineHeader(raw);
+    if (routine) return <RoutineRunRow header={routine} />;
     const files = message.parts.filter((p) => p.type === "file");
-    const text = stripTeammateEnvelope(texts.join("\n"));
-    const isRoutine = /<bezbot-routine /.test(texts.join("\n"));
+    const text = stripHeaders(raw);
     return (
       <div className="flex flex-col items-end gap-1.5" data-optimistic={message.metadata?.optimistic ? "true" : undefined}>
         {files.length > 0 ? (
@@ -362,17 +445,8 @@ export function BotMessage({
             ))}
           </div>
         ) : null}
-        {text ? (
-          <div
-            className={cn(
-              "max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[14.5px] whitespace-pre-wrap",
-              isRoutine ? "border border-white/10 bg-transparent text-neutral-400" : "bg-white/[0.09] text-neutral-50",
-            )}
-          >
-            {isRoutine ? text.replace(/<bezbot-routine[^>]*\/>\s*/, "⏰ ") : text}
-          </div>
-        ) : null}
-        <span className="pr-1 text-[11px] text-neutral-600">{isRoutine ? "Schedule" : userName}</span>
+        {text ? <div className="max-w-[85%] rounded-2xl rounded-br-md bg-white/[0.09] px-4 py-2.5 text-[14.5px] whitespace-pre-wrap text-neutral-50">{text}</div> : null}
+        <span className="pr-1 text-[11px] text-neutral-600">{userName}</span>
       </div>
     );
   }
@@ -381,7 +455,7 @@ export function BotMessage({
   const speaker = ctx.speaker;
   return (
     <div className="flex gap-3">
-      <BotAvatar color={speaker?.color} emoji={speaker?.emoji} name={speaker?.name} size="sm" className="mt-0.5" />
+      <BotAvatar className="mt-0.5" color={speaker?.color} emoji={speaker?.emoji} name={speaker?.name} size="sm" />
       <div className="min-w-0 flex-1 space-y-2">
         <div className="text-[12px] text-neutral-500">{speaker?.name ?? "Bot"}</div>
         {message.parts.map((part, index) => (

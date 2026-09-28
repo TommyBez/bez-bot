@@ -20,8 +20,12 @@ export function AppHeader({ title, body, actions }: { readonly title: string; re
   );
 }
 
-export function Card({ children, className = "" }: { readonly children: ReactNode; readonly className?: string }) {
-  return <div className={`rounded-[20px] border border-white/10 bg-[#0a0a0b] ${className}`}>{children}</div>;
+export function Card({ children, className = "", id }: { readonly children: ReactNode; readonly className?: string; readonly id?: string }) {
+  return (
+    <div className={`scroll-mt-6 rounded-[20px] border border-white/10 bg-[#0a0a0b] ${className}`} id={id}>
+      {children}
+    </div>
+  );
 }
 
 export function EmptyState({ title, body, action }: { readonly title: string; readonly body?: string; readonly action?: ReactNode }) {

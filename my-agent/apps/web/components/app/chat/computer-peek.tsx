@@ -1,6 +1,6 @@
 "use client";
 
-import { FileIcon, GlobeIcon, KeyRoundIcon, MonitorIcon, TerminalIcon, XIcon } from "lucide-react";
+import { FileIcon, GlobeIcon, GraduationCapIcon, KeyRoundIcon, MonitorIcon, TerminalIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BotAvatar, StatusDot } from "@/components/bez/bot-avatar";
@@ -17,7 +17,7 @@ const ICONS = { command: TerminalIcon, file: FileIcon, browser: GlobeIcon, scree
 
 export function ActivityList({ items, limit = 30 }: { readonly items: ComputerActivity[]; readonly limit?: number }) {
   const { state } = useAppState();
-  if (items.length === 0) return <p className="text-[12.5px] text-neutral-500">Nothing yet. When a bot runs commands, writes files, or browses, it shows up here.</p>;
+  if (items.length === 0) return <p className="text-[12.5px] text-neutral-500">Nothing yet. Commands, files, and browsing show up here as they happen.</p>;
   return (
     <ul className="space-y-2">
       {items.slice(0, limit).map((a) => {
@@ -65,17 +65,39 @@ export function Screen({ at, desktop }: { readonly at?: string | null; readonly 
   );
 }
 
-export function ComputerPeek({ onClose }: { readonly onClose?: () => void }) {
+/**
+ * The Agent Computer view for one Bot: its screen on the shared computer, the
+ * shared drive, and what it has been doing. "Teach a task" lives here.
+ */
+export function ComputerPeek({
+  botId,
+  onClose,
+  onTeach,
+}: {
+  readonly botId?: string;
+  readonly onClose?: () => void;
+  readonly onTeach?: () => void;
+}) {
   const { data } = usePoll<ComputerResponse>("/api/computer", 4000);
   const computer = data?.computer;
-  const working = computer?.activity[0] && Date.now() - new Date(computer.activity[0].at).getTime() < 60_000;
+  const activity = (computer?.activity ?? []).filter((a) => !botId || a.botId === botId);
+  const working = activity[0] && Date.now() - new Date(activity[0].at).getTime() < 60_000;
   return (
     <div className="scrollbar-thin flex h-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-[13px] text-white">
-          <MonitorIcon className="size-4" /> Computer
+          <MonitorIcon className="size-4" /> Agent Computer
         </span>
         <div className="flex items-center gap-3">
+          {onTeach ? (
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[11.5px] text-neutral-300 hover:border-white/25 hover:text-white"
+              onClick={onTeach}
+              type="button"
+            >
+              <GraduationCapIcon className="size-3.5" /> Teach a task
+            </button>
+          ) : null}
           <span className="flex items-center gap-1.5 text-[11.5px] text-neutral-400">
             <StatusDot className="size-2 ring-0" status={working ? "working" : "idle"} />
             {working ? "Working" : "Idle"}
@@ -91,8 +113,8 @@ export function ComputerPeek({ onClose }: { readonly onClose?: () => void }) {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] text-neutral-500">Shared drive · {computer?.files.length ?? 0} files</span>
-          <Link className="text-[12px] text-neutral-500 hover:text-white" href="/app/computer">
-            Open
+          <Link className="text-[12px] text-neutral-500 hover:text-white" href="/app/settings#computer">
+            Manage
           </Link>
         </div>
         <ul className="space-y-1">
@@ -107,7 +129,7 @@ export function ComputerPeek({ onClose }: { readonly onClose?: () => void }) {
       </div>
       <div>
         <div className="mb-2 text-[12px] text-neutral-500">Activity</div>
-        <ActivityList items={computer?.activity ?? []} limit={12} />
+        <ActivityList items={activity} limit={12} />
       </div>
     </div>
   );

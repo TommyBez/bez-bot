@@ -5,10 +5,9 @@ export default defineAgent({
   model: agentModel,
   ...agentModelWindow,
   description: "A Bez Bot teammate that owns a job end to end on its own computer.",
-  // Bots delegate to named teammates with `message_bot`, not anonymous root copies.
+  // Bots hand work to named teammates with `message_bot`, not anonymous copies of themselves.
   tool: false,
+  // Each Bot keeps one conversation for life; compaction keeps it within the context window.
   compaction: { thresholdPercent: 0.8 },
-  limits: {
-    sessionTimeoutMs: 90 * 24 * 60 * 60 * 1000,
-  },
+  limits: { sessionTimeoutMs: false },
 });

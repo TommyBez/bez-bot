@@ -1,24 +1,18 @@
 import { defineDynamic, defineInstructions } from "eve/instructions";
 import { buildPersona } from "../../lib/persona";
-import { identityFromAuth, routineFromMessages } from "../lib/identity";
+import { identityForSession } from "../lib/identity";
 
 /**
- * Turns the generic agent into the specific Bot this session belongs to.
- * Resolved every turn so memory, routines, and teammates stay current.
+ * Turns the generic agent into the specific Bot this conversation belongs to,
+ * and says where the current turn came from. Resolved every turn so memory,
+ * routines, skills, and teammates stay current.
  */
 export default defineDynamic({
   events: {
     "turn.started": async (_event, ctx) => {
-      const identity = identityFromAuth(ctx.session.auth.initiator);
+      const identity = await identityForSession(ctx.session);
       if (!identity) return null;
-      const routineId = identity.routineId ?? routineFromMessages(ctx.messages);
-      const content = await buildPersona({
-        userId: identity.userId,
-        botId: identity.botId,
-        mode: routineId ? "routine" : identity.mode === "teammate" ? "dm" : identity.mode,
-        threadId: identity.threadId,
-        routineId,
-      });
+      const content = await buildPersona(identity);
       return content ? defineInstructions({ content }) : null;
     },
   },

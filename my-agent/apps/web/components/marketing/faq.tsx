@@ -25,11 +25,11 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Where do I talk to Bez Bot?",
-    a: "Work with Bez Bot from any browser on desktop, install it as an app, or add it to your phone's home screen. Every conversation, thread, and approval follows you across devices.",
+    a: "Work with Bez Bot from any browser on desktop, install it as an app, or add it to your phone's home screen. Every conversation, group chat, and approval follows you across devices.",
   },
   {
     q: "How do Bots talk to each other?",
-    a: "Any Bot can message a teammate Bot with a request. The teammate works in its own session on the shared computer, and its reply wakes the first Bot up so it can keep going. Put several Bots in one thread and they coordinate on their own; you only step in for decisions and approvals.",
+    a: "Any Bot can message a teammate Bot with a request. It lands in the teammate's own conversation and wakes it up; the teammate does the work on the shared computer and replies, which wakes the first Bot so it can keep going. Put two to six Bots in a group chat and they coordinate on their own; you only step in for decisions and approvals.",
   },
   {
     q: "How much does Bez Bot cost?",
@@ -37,7 +37,7 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Do Bots share one computer?",
-    a: "Yes. Every Bot shares one persistent cloud computer per user. Your Bots share that machine's shared drive (files, downloads, and saved logins), so they can hand work off and keep context. Isolation is per user, not per Bot.",
+    a: "Yes. Every Bot shares one persistent cloud computer per user, and each Bot gets its own screen on it. Your Bots share its files, browser sessions, and saved logins, so they can hand work off and keep context. Isolation is per user, not per Bot.",
   },
   {
     q: "How does Bez Bot handle my data & privacy?",

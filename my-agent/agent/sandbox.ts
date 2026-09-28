@@ -1,11 +1,10 @@
 import { DefaultSandbox, defineSandbox } from "eve/sandbox";
 import { VercelSandbox } from "eve/sandbox/vercel";
-import { identityFromAuth } from "./lib/identity";
 import { restoreSharedDrive } from "./lib/computer";
 import { installComputerUse, startComputerUse } from "./lib/computer-use";
 
 /**
- * Each Bot's own computer.
+ * The user's computer, shared by all of their Bots.
  *
  * On Vercel (or with `BEZBOT_SANDBOX=vercel` and linked credentials) this is a
  * persistent Vercel Sandbox with a desktop: Xvfb, a window manager, Firefox,
@@ -29,10 +28,10 @@ export default defineSandbox(async ({ session }) => {
   const sandbox = await environment.open();
   await sandbox.run({ command: "mkdir -p /workspace/.bezbot /workspace/shared" });
 
-  const identity = identityFromAuth(session.auth.initiator);
-  if (identity) {
+  const userId = (session.auth.initiator?.attributes as Record<string, string> | undefined)?.userId;
+  if (userId) {
     try {
-      await restoreSharedDrive(sandbox, identity.userId);
+      await restoreSharedDrive(sandbox, userId);
     } catch (error) {
       console.warn("[bezbot] could not restore shared drive", error);
     }

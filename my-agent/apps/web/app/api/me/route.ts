@@ -13,6 +13,7 @@ export async function GET() {
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   timezone: z.string().optional(),
+  onboarded: z.boolean().optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -21,5 +22,6 @@ export async function PATCH(request: Request) {
   const body = await parseBody(request, patchSchema);
   if (body instanceof Response) return body;
   if (body.timezone && !isValidTimeZone(body.timezone)) return bad("Unknown timezone.");
-  return json({ user: await updateUser(user.id, body) });
+  const { onboarded, ...patch } = body;
+  return json({ user: await updateUser(user.id, { ...patch, ...(onboarded ? { onboardedAt: new Date().toISOString() } : {}) }) });
 }

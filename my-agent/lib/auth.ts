@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { type TeammateEnvelope, teammateEnvelopePayload } from "./protocol";
+import type { DeliveryClaims } from "./protocol";
 
 export const SESSION_COOKIE = "bezbot_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -74,28 +74,32 @@ export function readCookie(header: string | null | undefined, name: string): str
   return undefined;
 }
 
-/** HMAC token for server-to-server calls between the app and the agent. */
-export function internalToken(purpose: string): string {
-  return createHmac("sha256", appSecret()).update(`internal:${purpose}`).digest("base64url");
+const DELIVERY_TTL_SECONDS = 5 * 60;
+
+/**
+ * Credential that lets trusted server code post into a Bot's conversation on
+ * the user's behalf. The eve channel turns it into the turn's auth, so the
+ * turn's source (routine, teammate, group) can't be claimed by message text.
+ */
+export function signDelivery(claims: Omit<DeliveryClaims, "exp">): string {
+  const payload = b64url(JSON.stringify({ ...claims, exp: Math.floor(Date.now() / 1000) + DELIVERY_TTL_SECONDS }));
+  return `${payload}.${sign(`delivery:${payload}`)}`;
 }
 
-export function verifyInternalToken(purpose: string, token: string | null | undefined): boolean {
-  if (!token) return false;
-  const expected = Buffer.from(internalToken(purpose));
-  const actual = Buffer.from(token);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-/** Signs a teammate envelope so message text can't claim another user or bot. */
-export function signTeammateEnvelope(envelope: TeammateEnvelope): string {
-  return createHmac("sha256", appSecret()).update(teammateEnvelopePayload(envelope)).digest("base64url");
-}
-
-export function verifyTeammateEnvelope(envelope: TeammateEnvelope): boolean {
-  if (!envelope.sig) return false;
-  const expected = Buffer.from(signTeammateEnvelope(envelope));
-  const actual = Buffer.from(envelope.sig);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+export function verifyDelivery(token: string | null | undefined): DeliveryClaims | null {
+  if (!token) return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(sign(`delivery:${payload}`));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as DeliveryClaims;
+    if (typeof claims.uid !== "string" || typeof claims.bot !== "string" || claims.exp < Date.now() / 1000) return null;
+    return claims;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

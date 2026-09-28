@@ -1,4 +1,20 @@
-export type AutoReviewMode = "auto" | "always" | "off";
+export interface AutoReviewRule {
+  id: string;
+  /** "ask" always stops matching actions; "allow" lets them run without asking. Ask wins on conflict. */
+  kind: "ask" | "allow";
+  /** Tool the rule applies to, e.g. "bash" or "use_login". */
+  tool: string;
+  /** Case-insensitive substring of the action summary; empty matches every call of the tool. */
+  match: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface AutoReviewSettings {
+  /** When on, a reviewer model checks risky actions and asks you only when needed. */
+  enabled: boolean;
+  rules: AutoReviewRule[];
+}
 
 export interface User {
   id: string;
@@ -6,69 +22,92 @@ export interface User {
   email: string;
   createdAt: string;
   plan: "free" | "pro" | "pro_plus" | "ultra" | "teams";
+  /** IANA zone routines use; unset means auto-detect from the browser. */
   timezone?: string;
+  onboardedAt?: string;
+  autoReview: AutoReviewSettings;
 }
 
-export type BotStatus = "idle" | "working" | "waiting" | "error";
+/** Working: a turn is running. Attention: a question, approval, or handoff waits on you. */
+export type BotStatus = "idle" | "working" | "attention" | "error";
 
 export interface Bot {
   id: string;
   userId: string;
   name: string;
-  /** One line, e.g. "Generate pipeline overnight." */
-  job: string;
-  /** What the bot does, shown on its profile. */
+  /** Optional one-line title shown under the name, e.g. "Generate pipeline overnight." */
+  label: string;
+  /** The Bot's job and standing rules. The Bot reads it on every turn. */
   description: string;
-  /** Operator-authored instructions appended to the persona. */
-  instructions: string;
   emoji: string;
   color: string;
   templateId?: string;
-  autoReview: AutoReviewMode;
-  /** Other bots this bot may message autonomously. Empty means "any of my bots". */
-  allowedPeers: string[];
-  /** Whether this bot may start conversations with other bots on its own. */
-  autonomous: boolean;
+  /** The Bot's one persistent conversation (a durable eve session). */
+  sessionId?: string;
+  pinned: boolean;
+  hidden: boolean;
+  /** OS notification when the Bot finishes or needs input. */
+  notifications: boolean;
   status: BotStatus;
   statusText?: string;
-  lastActiveAt?: string;
+  /** New activity since the user last opened the chat. */
+  unread: boolean;
+  lastMessageAt?: string;
+  lastPreview?: string;
+  /** Set when another Bot created this one to help with its work. */
+  createdByBotId?: string;
   shareId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/** A 1:1 conversation with one bot. Backed by one durable eve session. */
-export interface Conversation {
+/** Two to six Bots and you in one conversation. */
+export interface Group {
   id: string;
   userId: string;
-  botId: string;
-  title: string;
-  sessionId?: string;
-  mode: "dm" | "teach" | "routine" | "botnet";
+  name: string;
+  /** Every Bot in the group reads this when it replies. */
+  description: string;
+  memberBotIds: string[];
+  /** Each member's durable eve session for this group. */
+  sessions: Record<string, string>;
+  /** Members currently working on something in this group. */
+  working: string[];
+  pinned: boolean;
+  hidden: boolean;
+  unread: boolean;
+  lastMessageAt?: string;
+  lastPreview?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/** A group thread: several bots plus the user. The lead bot owns the eve session. */
-export interface Thread {
+export interface GroupMessage {
   id: string;
-  userId: string;
-  title: string;
-  memberBotIds: string[];
-  leadBotId: string;
-  sessionId?: string;
+  groupId: string;
+  /** "user" or a Bot id. */
+  author: string;
+  text: string;
+  mentions: string[];
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface RoutineSchedule {
-  /** Repeat interval in minutes; null for a one-off run. */
+  /** Repeat interval in minutes; null when the routine runs at a clock time. */
   everyMinutes: number | null;
-  /** Optional daily clock time (HH:MM, 24h) in the user's timezone. */
+  /** Daily clock time (HH:MM, 24h) in the user's timezone. */
   at?: string | null;
   /** Weekdays (0=Sun..6=Sat) the daily time applies to. */
   days?: number[] | null;
   timezone: string;
+}
+
+export interface RoutineRun {
+  id: string;
+  trigger: "schedule" | "test" | "webhook";
+  status: "running" | "succeeded" | "failed";
+  startedAt: string;
+  finishedAt?: string;
 }
 
 export interface Routine {
@@ -76,18 +115,34 @@ export interface Routine {
   userId: string;
   botId: string;
   name: string;
-  description: string;
-  /** Step-by-step procedure the bot follows (markdown). */
-  steps: string;
-  source: "taught" | "manual" | "template" | "bot";
+  /** What the Bot does on each run (markdown). */
+  instruction: string;
+  source: "chat" | "template";
   schedule: RoutineSchedule | null;
   enabled: boolean;
   nextRunAt: string | null;
   lastRunAt?: string | null;
-  lastStatus?: "running" | "succeeded" | "failed" | "queued" | null;
-  lastSessionId?: string | null;
-  runCount: number;
+  /** The 20 most recent runs, newest first. */
+  runs: RoutineRun[];
   leaseUntil?: string | null;
+  /** Bearer key for the routine's webhook trigger. */
+  webhookKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A reusable set of instructions, shared by every Bot the user has. */
+export interface Skill {
+  id: string;
+  userId: string;
+  /** Slug used in the composer: /weekly-report */
+  slug: string;
+  name: string;
+  description: string;
+  body: string;
+  source: "taught" | "chat" | "template";
+  draft: boolean;
+  createdByBotId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,9 +150,7 @@ export interface Routine {
 export interface MemoryEntry {
   id: string;
   text: string;
-  source: "bot" | "user" | "teammate";
-  /** Bot that wrote the memory (for team memory). */
-  authorBotId?: string;
+  source: "bot" | "user";
   createdAt: string;
 }
 
@@ -107,73 +160,40 @@ export interface MemoryDoc {
   updatedAt: string;
 }
 
-export type InboxKind = "approval" | "question" | "done" | "memory" | "botnet" | "routine" | "error";
-
-export interface InboxItem {
-  id: string;
-  userId: string;
-  botId?: string;
-  kind: InboxKind;
-  title: string;
-  body?: string;
-  href?: string;
-  sessionId?: string;
-  read: boolean;
-  createdAt: string;
-}
-
-/** One autonomous message between two bots. */
-export interface BotnetMessage {
-  id: string;
-  userId: string;
-  exchangeId: string;
-  fromBotId: string;
-  toBotId: string;
-  kind: "request" | "reply" | "error";
-  text: string;
-  /** Session that sent the request (the reply wakes it). */
-  originSessionId?: string;
-  /** Child session doing the work for the recipient. */
-  childSessionId?: string;
-  agentId?: string;
-  depth: number;
-  createdAt: string;
-}
-
-export interface BotnetExchange {
+/** One conversation between two Bots: a request and the replies it gets. */
+export interface Exchange {
   id: string;
   userId: string;
   fromBotId: string;
   toBotId: string;
   subject: string;
-  status: "working" | "replied" | "failed";
-  originSessionId?: string;
-  threadId?: string;
-  /** eve's handle for the teammate child session, used to continue the conversation. */
-  agentId?: string;
-  /** Durable session id of the teammate doing the work (streamable). */
-  childSessionId?: string;
+  status: "open" | "replied";
+  /** Messages exchanged so far; capped to stop runaway loops. */
+  hops: number;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface ExchangeMessage {
+  id: string;
+  exchangeId: string;
+  fromBotId: string;
+  toBotId: string;
+  kind: "request" | "reply";
+  text: string;
+  createdAt: string;
+}
+
 /**
- * Who a durable eve session belongs to. Written by hooks when a session
- * starts so tools, sandbox selectors, and route auth can find it.
+ * Who a durable eve session belongs to: a Bot's own chat, or that Bot's seat
+ * in a group. Written when the session is created.
  */
-export interface SessionContextRecord {
+export interface SessionRecord {
   sessionId: string;
   userId: string;
   botId: string;
-  mode: "dm" | "thread" | "teach" | "routine" | "teammate";
-  threadId?: string;
-  conversationId?: string;
-  routineId?: string;
-  exchangeId?: string;
-  /** Bot that delegated to this teammate session. */
-  fromBotId?: string;
-  rootSessionId?: string;
-  depth: number;
+  kind: "bot" | "group";
+  groupId?: string;
   createdAt: string;
 }
 
@@ -211,16 +231,4 @@ export interface ComputerActivity {
   summary: string;
   detail?: string;
   at: string;
-}
-
-export interface TeachRecording {
-  id: string;
-  userId: string;
-  botId: string;
-  title: string;
-  notes: string;
-  frames: number;
-  durationMs: number;
-  conversationId?: string;
-  createdAt: string;
 }

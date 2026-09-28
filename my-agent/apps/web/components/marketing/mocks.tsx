@@ -37,7 +37,7 @@ export function AppWindow({
 
 const HERO_BOTS = [
   { name: "Sales Outbound", emoji: "📈", color: "#3b82f6", status: "working" as const, note: "Drafting 14 emails" },
-  { name: "Chief of Staff", emoji: "🧠", color: "#eab308", status: "waiting" as const, note: "Needs your approval" },
+  { name: "Chief of Staff", emoji: "🧠", color: "#eab308", status: "attention" as const, note: "Needs your approval" },
   { name: "Research", emoji: "🔬", color: "#14b8a6", status: "working" as const, note: "Comparing 6 sources" },
   { name: "Bug Reproduction", emoji: "🐞", color: "#ef4444", status: "idle" as const, note: "Filed BUG-2231" },
   { name: "Account Health", emoji: "❤️‍🩹", color: "#ec4899", status: "idle" as const, note: "3 accounts at risk" },
@@ -66,10 +66,10 @@ export function HeroAppMock() {
               </li>
             ))}
           </ul>
-          <div className="mt-5 mb-2 px-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase">Threads</div>
+          <div className="mt-5 mb-2 px-2 text-[11px] font-medium tracking-wide text-neutral-500 uppercase">Group chats</div>
           <ul className="space-y-0.5 text-[13px] text-neutral-400">
-            <li className="rounded-xl px-2 py-1.5"># q3-launch</li>
-            <li className="rounded-xl px-2 py-1.5"># weekly-brief</li>
+            <li className="rounded-xl px-2 py-1.5">Q3 launch</li>
+            <li className="rounded-xl px-2 py-1.5">Weekly brief</li>
           </ul>
         </aside>
         <section className="flex flex-col">
@@ -185,7 +185,7 @@ const MANY = [
   { name: "Project", emoji: "🗂️", color: "#a855f7", task: "Updating the launch plan", status: "working" as const },
   { name: "Outbound", emoji: "📈", color: "#3b82f6", task: "Researching 40 accounts", status: "working" as const },
   { name: "Systems", emoji: "🛠️", color: "#22c55e", task: "Reconciling Stripe payouts", status: "working" as const },
-  { name: "Research", emoji: "🔬", color: "#14b8a6", task: "Waiting on your answer", status: "waiting" as const },
+  { name: "Research", emoji: "🔬", color: "#14b8a6", task: "Waiting on your answer", status: "attention" as const },
 ];
 
 export function ManyBotsMock() {
@@ -329,7 +329,7 @@ export function ConnectMock() {
     return () => window.clearInterval(id);
   }, []);
   return (
-    <AppWindow title="# q3-offsite">
+    <AppWindow title="Q3 offsite · 5 Bots">
       <div className="space-y-3 p-5">
         <div className="ml-auto w-fit max-w-[80%] rounded-2xl rounded-br-md bg-white/[0.08] px-4 py-2.5 text-[13.5px] text-neutral-100">
           Plan the Q3 offsite: agenda, announcement, and travel for 12 people.

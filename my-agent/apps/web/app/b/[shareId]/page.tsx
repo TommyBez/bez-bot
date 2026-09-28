@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { readonly params: Promise<{ 
   const { shareId } = await params;
   const shared = await getSharedBot(shareId);
   if (!shared) return { title: "Bot" };
-  const description = `${shared.job} ${shared.description}`.slice(0, 160);
+  const description = `${shared.label} ${shared.description}`.slice(0, 160);
   return { title: shared.name, description, openGraph: { title: shared.name, description } };
 }
 
@@ -31,9 +31,21 @@ export default async function SharedBotPage({ params }: { readonly params: Promi
         </div>
         <div className="space-y-3">
           <h1 className="text-4xl font-medium tracking-tight text-white">{shared.name}</h1>
-          <p className="text-[17px] text-neutral-300">{shared.job}</p>
-          {shared.description ? <p className="text-[15px] leading-relaxed text-neutral-500">{shared.description}</p> : null}
+          <p className="text-[17px] text-neutral-300">{shared.label}</p>
+          {shared.description ? (
+            <p className="line-clamp-4 text-[15px] leading-relaxed text-neutral-500">{shared.description.split("\n\n")[0]}</p>
+          ) : null}
         </div>
+        {(shared.skills ?? []).length > 0 ? (
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
+            <div className="text-[12.5px] text-neutral-500">Skills · playbooks it can run</div>
+            {shared.skills.map((s) => (
+              <div className="text-[14px] text-neutral-300" key={s.slug}>
+                /{s.slug} <span className="text-neutral-600">· {s.description}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {shared.routines.length > 0 ? (
           <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
             <div className="text-[12.5px] text-neutral-500">Includes routines</div>

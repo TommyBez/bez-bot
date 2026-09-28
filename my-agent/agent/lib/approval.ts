@@ -1,10 +1,12 @@
 import { type ApprovalContext, type ApprovalStatus, auto } from "eve/tools/approval";
-import { getBot } from "../../lib/store/repo";
+import { actionSummary } from "../../lib/actions";
+import { getUser } from "../../lib/store/repo";
+import type { AutoReviewRule } from "../../lib/store/types";
 import { identityForSession } from "./identity";
 
 /**
- * Auto Review: a reviewer model (Jev via AI Gateway) looks at the exact call
- * and only asks the person when it sees real risk.
+ * Auto Review: an independent reviewer model looks at the exact call and
+ * only asks the person when it sees real risk.
  */
 const reviewer = auto({
   instructions:
@@ -15,36 +17,42 @@ const reviewer = auto({
   },
 });
 
-function routineDenial(): ApprovalStatus {
-  return {
-    type: "denied",
-    reason:
-      "This run was started by a schedule and nobody can approve actions right now. Leave this action as a decision for the user and call notify_user.",
-  };
+function matching(rules: AutoReviewRule[], toolName: string, input: unknown): { ask: boolean; allow: boolean } {
+  const summary = actionSummary(toolName, input).toLowerCase();
+  const hit = (r: AutoReviewRule) => r.tool === toolName && (!r.match || summary.includes(r.match.toLowerCase()));
+  return { ask: rules.some((r) => r.kind === "ask" && hit(r)), allow: rules.some((r) => r.kind === "allow" && hit(r)) };
 }
 
-async function modeFor(ctx: ApprovalContext<Record<string, unknown>>) {
+async function settingsFor(ctx: ApprovalContext<Record<string, unknown>>) {
   const identity = await identityForSession(ctx.session);
-  const bot = identity ? await getBot(identity.botId) : null;
-  return { identity, mode: bot?.autoReview ?? "auto" };
+  const user = identity ? await getUser(identity.userId) : null;
+  return user?.autoReview ?? { enabled: true, rules: [] };
 }
 
-/** Sensitive tools (shell, computer control): follow the bot's Auto Review setting. */
+/**
+ * Risky tools (shell, logins, creating Bots). "Ask first" rules always stop
+ * the action, "Allow automatically" rules let it through, and otherwise the
+ * reviewer decides. With Auto Review off, the person is asked.
+ */
 export async function sensitiveApproval(ctx: ApprovalContext<Record<string, unknown>>): Promise<ApprovalStatus> {
-  const { identity, mode } = await modeFor(ctx);
-  if (mode === "off") return "not-applicable";
-  const decision = mode === "always" ? "user-approval" : await reviewer(ctx);
-  const needsPerson =
-    decision === "user-approval" ||
-    decision === true ||
-    (typeof decision === "object" && decision !== null && decision.type === "user-approval");
-  if (needsPerson && identity?.mode === "routine") return routineDenial();
-  return decision;
+  const settings = await settingsFor(ctx);
+  const rules = matching(settings.rules, ctx.toolName, ctx.toolInput);
+  if (rules.ask) return "user-approval";
+  if (rules.allow) return "not-applicable";
+  if (!settings.enabled) return "user-approval";
+  return reviewer(ctx);
 }
 
-/** Destructive tools: always ask a person, even with Auto Review off. */
+/** Destructive tools: always ask, unless the person saved an "Always allow" rule for it. */
 export async function destructiveApproval(ctx: ApprovalContext<Record<string, unknown>>): Promise<ApprovalStatus> {
-  const identity = await identityForSession(ctx.session);
-  if (identity?.mode === "routine") return routineDenial();
+  const settings = await settingsFor(ctx);
+  const rules = matching(settings.rules, ctx.toolName, ctx.toolInput);
+  if (rules.allow && !rules.ask) return "not-applicable";
   return "user-approval";
+}
+
+/** Desktop clicks and typing: only an explicit "Ask first" rule stops them. */
+export async function ruleOnlyApproval(ctx: ApprovalContext<Record<string, unknown>>): Promise<ApprovalStatus> {
+  const settings = await settingsFor(ctx);
+  return matching(settings.rules, ctx.toolName, ctx.toolInput).ask ? "user-approval" : "not-applicable";
 }

@@ -127,7 +127,7 @@ export default async function LandingPage() {
         />
 
         <Feature
-          body="Put a few Bots in the same thread and they pass work between themselves. Bots message each other on their own, asking for context and handing off tasks. You watch them take action instead of approving every step."
+          body="Put a few Bots in the same group chat and they pass work between themselves. Bots message each other on their own, asking for context and handing off tasks. You watch them take action instead of approving every step."
           id="connect"
           reverse
           title="Connect the Bots"

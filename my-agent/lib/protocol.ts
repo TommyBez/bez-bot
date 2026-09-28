@@ -2,18 +2,13 @@
  * Wire conventions shared by the web app and the eve agent.
  */
 
-/** Header the browser sends with every eve request to say which bot/thread it is talking to. */
+/** Header the browser sends with every eve request to say which Bot it is talking to. */
 export const CONTEXT_HEADER = "x-bezbot-context";
-/** Header used by trusted server code (routine dispatch, app actions). */
+/** Header carrying a signed delivery credential from trusted server code. */
 export const INTERNAL_HEADER = "x-bezbot-internal";
 
-export type ClientSessionMode = "dm" | "thread" | "teach";
-
 export interface ClientSessionContext {
-  mode: ClientSessionMode;
-  botId?: string;
-  threadId?: string;
-  conversationId?: string;
+  botId: string;
 }
 
 export function encodeClientContext(context: ClientSessionContext): string {
@@ -26,99 +21,154 @@ export function encodeClientContext(context: ClientSessionContext): string {
 export function decodeClientContext(value: string | null | undefined): ClientSessionContext | null {
   if (!value) return null;
   try {
-    const json = Buffer.from(value, "base64url").toString("utf8");
-    const parsed = JSON.parse(json) as ClientSessionContext;
-    if (parsed.mode !== "dm" && parsed.mode !== "thread" && parsed.mode !== "teach") return null;
-    return parsed;
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as ClientSessionContext;
+    return typeof parsed.botId === "string" ? parsed : null;
   } catch {
     return null;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Teammate envelope: the first line of a delegated bot-to-bot message names the
-// recipient bot so its persona can be loaded inside the child session.
+// Turn sources. Every message that reaches a Bot's conversation says where it
+// came from. The authenticated source travels in the signed delivery
+// credential (see lib/auth.ts); the headers below are only for display and for
+// the model's benefit, so a user typing one into their own chat changes
+// nothing but how that message looks.
 // ---------------------------------------------------------------------------
 
-export interface TeammateEnvelope {
-  userId: string;
-  botId: string;
-  fromBotId: string;
-  exchangeId: string;
-  depth: number;
-  threadId?: string;
-  /** HMAC over {@link teammateEnvelopePayload}, minted by server code only. */
-  sig?: string;
+export type TurnSource = "user" | "teammate" | "routine" | "group" | "system";
+
+/** Claims inside a signed delivery credential. */
+export interface DeliveryClaims {
+  uid: string;
+  bot: string;
+  /** Which conversation of the Bot: its own chat, or its seat in a group. */
+  kind: "bot" | "group";
+  grp?: string;
+  src: TurnSource;
+  /** Sending Bot, for teammate messages. */
+  from?: string;
+  xch?: string;
+  mk?: "request" | "reply";
+  rtn?: string;
+  run?: string;
+  exp: number;
 }
 
-/** Canonical string the envelope signature covers. */
-export function teammateEnvelopePayload(envelope: TeammateEnvelope): string {
-  return ["teammate", envelope.userId, envelope.botId, envelope.fromBotId, envelope.exchangeId, envelope.depth, envelope.threadId ?? ""].join("|");
+function attr(value: string): string {
+  return value.replace(/["<>\n]/g, " ").trim();
 }
 
-const ENVELOPE_RE = /<bezbot-teammate\s+([^>]*)\/>/;
-
-/**
- * The recipient's persona travels inside the first handoff message: instruction
- * resolvers for a brand-new child session run before its first message is
- * visible, so the envelope alone would arrive one turn too late.
- */
-export function formatTeammateMessage(envelope: TeammateEnvelope, fromName: string, text: string, persona?: string | null): string {
-  const attrs = Object.entries(envelope)
-    .filter(([, v]) => v !== undefined && v !== null && v !== "")
-    .map(([k, v]) => `${k}="${String(v).replace(/"/g, "")}"`)
-    .join(" ");
-  const personaBlock = persona ? `<bezbot-persona>\n${persona}\n</bezbot-persona>\n` : "";
-  return `<bezbot-teammate ${attrs}/>\n${personaBlock}Message from your teammate ${fromName}:\n\n${text}`;
-}
-
-export function parseTeammateEnvelope(text: string | null | undefined): TeammateEnvelope | null {
-  if (!text) return null;
-  const match = ENVELOPE_RE.exec(text);
-  if (!match) return null;
+function parseAttrs(raw: string): Record<string, string> {
   const attrs: Record<string, string> = {};
-  for (const m of match[1]!.matchAll(/(\w+)="([^"]*)"/g)) attrs[m[1]!] = m[2]!;
-  if (!attrs.userId || !attrs.botId || !attrs.fromBotId || !attrs.exchangeId) return null;
+  for (const m of raw.matchAll(/(\w+)="([^"]*)"/g)) attrs[m[1]!] = m[2]!;
+  return attrs;
+}
+
+// --- Messages between Bots --------------------------------------------------
+
+export interface TeammateHeader {
+  kind: "request" | "reply";
+  fromBotId: string;
+  fromName: string;
+  exchangeId: string;
+}
+
+const TEAMMATE_RE = /^<bezbot-from\s+([^>]*)\/>\n?/;
+
+export function formatTeammateMessage(header: TeammateHeader, text: string): string {
+  return `<bezbot-from kind="${header.kind}" bot="${attr(header.fromBotId)}" name="${attr(header.fromName)}" exchange="${attr(header.exchangeId)}"/>\n${text}`;
+}
+
+export function parseTeammateHeader(text: string | null | undefined): (TeammateHeader & { body: string }) | null {
+  if (!text) return null;
+  const match = TEAMMATE_RE.exec(text);
+  if (!match) return null;
+  const a = parseAttrs(match[1]!);
+  if (!a.bot || !a.exchange) return null;
   return {
-    userId: attrs.userId,
-    botId: attrs.botId,
-    fromBotId: attrs.fromBotId,
-    exchangeId: attrs.exchangeId,
-    depth: Number(attrs.depth ?? "1") || 1,
-    threadId: attrs.threadId || undefined,
-    sig: attrs.sig || undefined,
+    kind: a.kind === "reply" ? "reply" : "request",
+    fromBotId: a.bot,
+    fromName: a.name ?? "A teammate",
+    exchangeId: a.exchange,
+    body: text.slice(match[0].length),
   };
 }
 
-/** Removes the machine envelope for display. */
-export function stripTeammateEnvelope(text: string): string {
-  const at = text.search(ENVELOPE_RE);
-  const body = at >= 0 ? text.slice(at) : text;
-  return body
-    .replace(ENVELOPE_RE, "")
-    .replace(/<bezbot-persona>[\s\S]*?<\/bezbot-persona>\s*/, "")
-    .replace(/^\s*Message from your teammate [^:\n]+:\s*/m, "")
-    .trim();
+// --- Routine runs -------------------------------------------------------------
+
+export interface RoutineHeader {
+  routineId: string;
+  runId: string;
+  name: string;
+  trigger: "schedule" | "test" | "webhook";
 }
 
-/** Routine runs start with this marker so the persona resolver knows the routine. */
-export function formatRoutinePrompt(routine: { id: string; name: string; steps: string }, trigger: "schedule" | "manual"): string {
+const ROUTINE_RE = /^<bezbot-routine\s+([^>]*)\/>\n?/;
+
+export function formatRoutineMessage(header: RoutineHeader, instruction: string, payload?: string): string {
   return [
-    `<bezbot-routine id="${routine.id}" trigger="${trigger}"/>`,
-    `Run your routine "${routine.name}" now. No one is watching live, so finish the work end to end.`,
+    `<bezbot-routine id="${attr(header.routineId)}" run="${attr(header.runId)}" name="${attr(header.name)}" trigger="${header.trigger}"/>`,
+    `Run your routine "${header.name}" now and post the result here.`,
     "",
-    "Steps:",
-    routine.steps,
-    "",
-    "When you are done, reply with a short report of what you did and anything the user needs to decide.",
+    instruction,
+    ...(payload ? ["", "Webhook payload:", "```json", payload, "```"] : []),
   ].join("\n");
 }
 
-export function parseRoutineMarker(text: string | null | undefined): { routineId: string; trigger: string } | null {
+export function parseRoutineHeader(text: string | null | undefined): (RoutineHeader & { body: string }) | null {
   if (!text) return null;
-  const match = /<bezbot-routine id="([^"]+)" trigger="([^"]+)"\/>/.exec(text);
-  return match ? { routineId: match[1]!, trigger: match[2]! } : null;
+  const match = ROUTINE_RE.exec(text);
+  if (!match) return null;
+  const a = parseAttrs(match[1]!);
+  if (!a.id) return null;
+  const trigger = a.trigger === "test" || a.trigger === "webhook" ? a.trigger : "schedule";
+  return { routineId: a.id, runId: a.run ?? "", name: a.name ?? "Routine", trigger, body: text.slice(match[0].length) };
 }
 
-export const MAX_TEAMMATE_DEPTH = 2;
+// --- Group chats --------------------------------------------------------------
+
+/** A Bot that has nothing to add to a group message answers with exactly this. */
+export const NO_REPLY = "NO_REPLY";
+
+export interface GroupHeader {
+  groupId: string;
+  groupName: string;
+  /** must: you were @-mentioned. maybe: decide whether the message is yours. */
+  respond: "must" | "maybe";
+}
+
+const GROUP_RE = /^<bezbot-group\s+([^>]*)\/>\n?/;
+
+export function formatGroupMessage(header: GroupHeader, lines: { author: string; text: string }[]): string {
+  const transcript = lines.map((l) => `**${l.author}:** ${l.text}`).join("\n\n");
+  return `<bezbot-group id="${attr(header.groupId)}" name="${attr(header.groupName)}" respond="${header.respond}"/>\n${transcript}`;
+}
+
+export function parseGroupHeader(text: string | null | undefined): (GroupHeader & { body: string }) | null {
+  if (!text) return null;
+  const match = GROUP_RE.exec(text);
+  if (!match) return null;
+  const a = parseAttrs(match[1]!);
+  if (!a.id) return null;
+  return { groupId: a.id, groupName: a.name ?? "Group", respond: a.respond === "must" ? "must" : "maybe", body: text.slice(match[0].length) };
+}
+
+/** Removes machine headers for display. */
+export function stripHeaders(text: string): string {
+  return text.replace(TEAMMATE_RE, "").replace(ROUTINE_RE, "").replace(GROUP_RE, "").trim();
+}
+
+/** `@Name` mentions resolved against a roster (longest names first). */
+export function findMentions(text: string, roster: { id: string; name: string }[]): string[] {
+  const lower = text.toLowerCase();
+  const hits = new Set<string>();
+  for (const bot of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+    const needle = `@${bot.name.toLowerCase()}`;
+    const compact = `@${bot.name.toLowerCase().replace(/\s+/g, "")}`;
+    if (lower.includes(needle) || lower.includes(compact)) hits.add(bot.id);
+  }
+  return [...hits];
+}
+
 export const BOTNET_MAX_PER_HOUR = 60;

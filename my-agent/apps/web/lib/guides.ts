@@ -32,7 +32,7 @@ export const GUIDES: Guide[] = [
       {
         heading: "Show it once, it runs forever",
         body: [
-          "Teach a task by recording your screen while you do it. The Bot watches, writes the procedure as a routine, and runs it on a schedule from then on. Routines report to your inbox, and anything that needs approval waits for you.",
+          "Teach a task by recording your screen while you do it. The Bot watches, writes it up as a skill any Bot can reuse, and you can ask it to run that skill on a routine. Each run posts its result in the Bot's chat, and anything that needs approval waits for you there.",
         ],
       },
       {
@@ -61,7 +61,7 @@ export const GUIDES: Guide[] = [
       },
       {
         heading: "Keep humans on the send button",
-        body: ["Leave Auto Review on. Drafting, research, and CRM reads run freely; sending email, changing deal stages, or offering discounts waits for your approval in the inbox."],
+        body: ["Leave Auto Review on. Drafting, research, and CRM reads run freely; sending email, changing deal stages, or offering discounts waits for your approval in the Bot's chat."],
       },
     ],
   },
@@ -95,7 +95,7 @@ export const GUIDES: Guide[] = [
       },
       {
         heading: "Copy that fits the frame",
-        body: ["Loop in Comms from a design thread to draft microcopy variants in your brand voice, with character limits you set once in team memory."],
+        body: ["Put Comms in a design group chat to draft microcopy variants in your brand voice. Tell it your character limits once; it remembers them."],
       },
     ],
   },

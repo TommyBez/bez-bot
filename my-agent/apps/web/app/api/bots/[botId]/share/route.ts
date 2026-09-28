@@ -2,7 +2,7 @@ import { shareBot } from "@shared/store/repo";
 import { bad, json } from "@/lib/http";
 import { userOr401 } from "@/lib/session";
 
-/** Publishes a public "Add to Bez Bot" page for this bot (like x.ai/bot/<id>). */
+/** Share menu → Create template: a public "Add to Bez Bot" link with the Bot's identity, description, skills, and routines. */
 export async function POST(_request: Request, { params }: { params: Promise<{ botId: string }> }) {
   const user = await userOr401();
   if (user instanceof Response) return user;

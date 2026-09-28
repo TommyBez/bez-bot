@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import type { BotStatus } from "@shared/store/types";
 
 export function BotAvatar({
   emoji,
@@ -12,7 +13,7 @@ export function BotAvatar({
   readonly color?: string;
   readonly name?: string;
   readonly size?: "xs" | "sm" | "md" | "lg" | "xl";
-  readonly status?: "idle" | "working" | "waiting" | "error";
+  readonly status?: BotStatus;
   readonly className?: string;
 }) {
   const sizes = {
@@ -42,16 +43,16 @@ export function BotAvatar({
 
 export function botStatusLabel(status: string, text?: string): string {
   if (status === "working") return text ?? "Working";
-  if (status === "waiting") return text ?? "Needs you";
+  if (status === "attention") return text ?? "Needs attention";
   if (status === "error") return "Hit an error";
   return "Idle";
 }
 
-export function StatusDot({ status, className }: { readonly status: "idle" | "working" | "waiting" | "error"; readonly className?: string }) {
+export function StatusDot({ status, className }: { readonly status: BotStatus; readonly className?: string }) {
   const colors = {
     idle: "bg-neutral-500",
     working: "bg-emerald-400 animate-pulse-dot",
-    waiting: "bg-amber-400",
+    attention: "bg-amber-400",
     error: "bg-red-500",
   } as const;
   return <span className={cn("size-2.5 rounded-full ring-2 ring-black", colors[status], className)} />;
