@@ -1,7 +1,9 @@
 import { defineAgent } from "eve";
+import { agentModel, agentModelWindow } from "./lib/model";
 
 export default defineAgent({
-  model: "spacexai/grok-4.7",
+  model: agentModel,
+  ...agentModelWindow,
   description: "A Bez Bot teammate that owns a job end to end on its own computer.",
   // Bots delegate to named teammates with `message_bot`, not anonymous root copies.
   tool: false,

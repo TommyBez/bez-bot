@@ -21,21 +21,29 @@ const SANDBOX_TOOLS = new Set(["bash", "write_file", "read_file", "computer", "u
  */
 export default defineHook({
   events: {
-    async "action.result"(event, ctx) {
-      const result = event.data.result;
-      if (result.kind !== "tool-result") return;
-      if (SANDBOX_TOOLS.has(result.toolName)) await kv().set(`sandbox-used:${ctx.session.id}`, true);
-      const kind = COMPUTER_TOOLS[result.toolName];
-      if (!kind || kind === "credential") return;
+    async "actions.requested"(event, ctx) {
+      const calls = event.data.actions.filter(
+        (a): a is Extract<typeof a, { kind: "tool-call" }> => a.kind === "tool-call" && a.toolName in COMPUTER_TOOLS,
+      );
+      if (calls.length === 0) return;
+      if (calls.some((a) => SANDBOX_TOOLS.has(a.toolName))) await kv().set(`sandbox-used:${ctx.session.id}`, true);
       const identity = await identityForSession(ctx.session);
       if (!identity) return;
-      const label = event.data.presentation?.[result.callId]?.label ?? result.toolName;
-      await logComputerActivity(identity.userId, {
-        botId: identity.botId,
-        kind,
-        summary: label,
-        detail: result.isError ? "failed" : undefined,
-      });
+      for (const call of calls) {
+        const kind = COMPUTER_TOOLS[call.toolName]!;
+        if (kind === "credential") continue;
+        const input = (call.input ?? {}) as Record<string, unknown>;
+        const label = event.data.presentation?.[call.callId]?.label ?? call.toolName;
+        const detail =
+          typeof input.command === "string"
+            ? input.command.slice(0, 160)
+            : typeof input.filePath === "string"
+              ? input.filePath
+              : typeof input.url === "string"
+                ? input.url
+                : undefined;
+        await logComputerActivity(identity.userId, { botId: identity.botId, kind, summary: label, detail });
+      }
     },
     async "turn.completed"(_event, ctx) {
       const used = await kv().get<boolean>(`sandbox-used:${ctx.session.id}`);

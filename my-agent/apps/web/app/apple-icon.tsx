@@ -9,12 +9,12 @@ export const contentType = "image/png";
 
 export default function AppleIcon() {
   return new ImageResponse(
-    <svg fill="none" viewBox="0 0 102 102" xmlns="http://www.w3.org/2000/svg">
-      <path d="M0 0h102v102H0z" fill="#000" />
-      <path
-        d="M49.28 66.94 75.03 34.96h-6.89L47.91 60.11l-5.49 6.83h6.86ZM0 34.96h42.4v5.11H0zm0 13.32h27.66v5.11H0zm0 13.54h27.66v5.11H0zm69.63-26.86H102v5.11H69.63zm4.71 13.32H102v5.11H74.34zm0 13.54H102v5.11H74.34z"
-        fill="#fff"
-      />
+    <svg fill="none" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <rect fill="#000" height="64" width="64" />
+      <rect height="46" rx="14" stroke="#fff" strokeWidth="3.5" width="46" x="9" y="9" />
+      <circle cx="24.5" cy="28" fill="#fff" r="4.2" />
+      <circle cx="39.5" cy="28" fill="#fff" r="4.2" />
+      <path d="M23 38.5c2.6 2.6 5.6 3.9 9 3.9s6.4-1.3 9-3.9" stroke="#fff" strokeLinecap="round" strokeWidth="3.5" />
     </svg>,
     size,
   );

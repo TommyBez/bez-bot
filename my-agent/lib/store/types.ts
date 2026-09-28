@@ -149,7 +149,10 @@ export interface BotnetExchange {
   status: "working" | "replied" | "failed";
   originSessionId?: string;
   threadId?: string;
+  /** eve's handle for the teammate child session, used to continue the conversation. */
   agentId?: string;
+  /** Durable session id of the teammate doing the work (streamable). */
+  childSessionId?: string;
   createdAt: string;
   updatedAt: string;
 }

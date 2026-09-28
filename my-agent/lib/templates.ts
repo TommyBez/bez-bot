@@ -54,7 +54,7 @@ export const TEMPLATES: BotTemplate[] = [
         name: "Nightly pipeline build",
         description: "Research new accounts and prepare a morning review list.",
         steps:
-          "1. Load the ICP and exclusions from memory.\n2. Find 10 new matching accounts with a fresh intent signal.\n3. Pick 1-2 contacts per account and score intent 1-5.\n4. Draft an email and LinkedIn note for each contact in /workspace/outbound/<date>.md.\n5. Message the user with the review list.",
+          "1. Load the ICP and exclusions from memory.\n2. Find 10 new matching accounts with a fresh intent signal.\n3. Pick 1-2 contacts per account and score intent 1-5.\n4. Draft an email and LinkedIn note for each contact in /workspace/shared/outbound/<date>.md.\n5. Message the user with the review list.",
         schedule: { everyMinutes: null, at: "02:00", days: [1, 2, 3, 4, 5] },
       },
     ],
@@ -86,7 +86,7 @@ export const TEMPLATES: BotTemplate[] = [
         name: "Weekly sourcing sweep",
         description: "Refresh the shortlist for every open role.",
         steps:
-          "1. List open roles from memory.\n2. Source 5 new candidates per role.\n3. Update /workspace/talent/shortlist.md with ranked evidence.\n4. Summarize changes for the user.",
+          "1. List open roles from memory.\n2. Source 5 new candidates per role.\n3. Update /workspace/shared/talent/shortlist.md with ranked evidence.\n4. Summarize changes for the user.",
         schedule: { everyMinutes: null, at: "09:00", days: [1] },
       },
     ],
@@ -171,7 +171,7 @@ export const TEMPLATES: BotTemplate[] = [
         name: "Morning metrics brief",
         description: "Explain yesterday's metric changes.",
         steps:
-          "1. Pull yesterday's core metrics.\n2. Compare to the trailing 7-day baseline.\n3. Segment any >5% change by platform, country, and plan.\n4. Write the brief to /workspace/metrics/<date>.md and share the summary.",
+          "1. Pull yesterday's core metrics.\n2. Compare to the trailing 7-day baseline.\n3. Segment any >5% change by platform, country, and plan.\n4. Write the brief to /workspace/shared/metrics/<date>.md and share the summary.",
         schedule: { everyMinutes: null, at: "07:30", days: [1, 2, 3, 4, 5] },
       },
     ],
@@ -192,7 +192,7 @@ export const TEMPLATES: BotTemplate[] = [
       "You reproduce bugs.",
       "Use the computer's browser and terminal to reproduce each report. Capture exact steps, expected vs actual, environment, and screenshots.",
       "If you cannot reproduce, say what you tried and what information is missing.",
-      "File clean tickets as markdown in /workspace/bugs/ and summarize them for the user.",
+      "File clean tickets as markdown in /workspace/shared/bugs/ and summarize them for the user.",
     ].join("\n"),
     starters: ["Reproduce: 'checkout button does nothing on Safari'", "Triage the last 10 bug reports."],
     routines: [
@@ -256,7 +256,7 @@ export const TEMPLATES: BotTemplate[] = [
         name: "Monday team brief",
         description: "Collect updates from every bot and write the brief.",
         steps:
-          "1. Message every other bot for a status update, in parallel.\n2. Merge the replies into a brief: wins, risks, decisions needed.\n3. Save it to /workspace/briefs/<date>.md.\n4. Share the brief and the decisions you need from the user.",
+          "1. Message every other bot for a status update, in parallel.\n2. Merge the replies into a brief: wins, risks, decisions needed.\n3. Save it to /workspace/shared/briefs/<date>.md.\n4. Share the brief and the decisions you need from the user.",
         schedule: { everyMinutes: null, at: "08:00", days: [1] },
       },
     ],

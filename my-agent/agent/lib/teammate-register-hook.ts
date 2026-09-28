@@ -1,5 +1,6 @@
 import { defineHook } from "eve/hooks";
 import { parseTeammateEnvelope } from "../../lib/protocol";
+import { kv } from "../../lib/store/kv";
 import { registerSession, updateExchange } from "../../lib/store/repo";
 
 /**
@@ -26,7 +27,8 @@ export default defineHook({
         },
         { upsert: true },
       );
-      await updateExchange(envelope.exchangeId, { agentId: ctx.session.id });
+      const agentId = await kv().get<string>(`child-agent:${ctx.session.id}`);
+      await updateExchange(envelope.exchangeId, { childSessionId: ctx.session.id, ...(agentId ? { agentId } : {}) });
     },
   },
 });

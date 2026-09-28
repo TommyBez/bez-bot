@@ -51,12 +51,18 @@ export interface TeammateEnvelope {
 
 const ENVELOPE_RE = /<bezbot-teammate\s+([^>]*)\/>/;
 
-export function formatTeammateMessage(envelope: TeammateEnvelope, fromName: string, text: string): string {
+/**
+ * The recipient's persona travels inside the first handoff message: instruction
+ * resolvers for a brand-new child session run before its first message is
+ * visible, so the envelope alone would arrive one turn too late.
+ */
+export function formatTeammateMessage(envelope: TeammateEnvelope, fromName: string, text: string, persona?: string | null): string {
   const attrs = Object.entries(envelope)
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
     .map(([k, v]) => `${k}="${String(v).replace(/"/g, "")}"`)
     .join(" ");
-  return `<bezbot-teammate ${attrs}/>\nMessage from your teammate ${fromName}:\n\n${text}`;
+  const personaBlock = persona ? `<bezbot-persona>\n${persona}\n</bezbot-persona>\n` : "";
+  return `<bezbot-teammate ${attrs}/>\n${personaBlock}Message from your teammate ${fromName}:\n\n${text}`;
 }
 
 export function parseTeammateEnvelope(text: string | null | undefined): TeammateEnvelope | null {
@@ -78,7 +84,13 @@ export function parseTeammateEnvelope(text: string | null | undefined): Teammate
 
 /** Removes the machine envelope for display. */
 export function stripTeammateEnvelope(text: string): string {
-  return text.replace(ENVELOPE_RE, "").replace(/^\s*Message from your teammate [^:\n]+:\s*/m, "").trim();
+  const at = text.search(ENVELOPE_RE);
+  const body = at >= 0 ? text.slice(at) : text;
+  return body
+    .replace(ENVELOPE_RE, "")
+    .replace(/<bezbot-persona>[\s\S]*?<\/bezbot-persona>\s*/, "")
+    .replace(/^\s*Message from your teammate [^:\n]+:\s*/m, "")
+    .trim();
 }
 
 /** Routine runs start with this marker so the persona resolver knows the routine. */

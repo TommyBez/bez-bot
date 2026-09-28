@@ -1,5 +1,6 @@
 import { defineWorkflowTool, type WorkflowStepToolContext } from "eve/tools";
 import { z } from "zod";
+import { buildPersona } from "../../../lib/persona";
 import { BOTNET_MAX_PER_HOUR, formatTeammateMessage, MAX_TEAMMATE_DEPTH } from "../../../lib/protocol";
 import {
   appendBotnetMessage,
@@ -104,6 +105,16 @@ async function planHandoff(
     depth: identity.depth + 1,
   });
   await setBotStatus(target.id, "working", `Working for ${self.name}`);
+  const persona = agentId
+    ? null
+    : await buildPersona({
+        userId: identity.userId,
+        botId: target.id,
+        mode: "teammate",
+        fromBotId: self.id,
+        threadId: identity.threadId,
+        depth: identity.depth + 1,
+      });
 
   return {
     ok: true,
@@ -125,6 +136,7 @@ async function planHandoff(
       },
       self.name,
       input.message,
+      persona,
     ),
   };
 }
